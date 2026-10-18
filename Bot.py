@@ -76,12 +76,17 @@ def fetch_products_with_selenium(category, budget_range):
     products_list = []
     
     try:
-        # আমাজনের রিয়েল সার্চ পেজ লিংক তৈরি করা
-        search_query = category.replace(' ', '+')
-        target_url = f"https://www.amazon.in/s?k={search_query}"
-        
-        driver.get(target_url)
-        time.sleep(5) # পেজ পুরোপুরি লোড হওয়ার জন্য সময় দেওয়া
+            # প্রথমে অ্যামাজনের হোমপেজে যাবে যাতে বট ডিটেক্ট করে ব্লক না করে
+    driver.get("https://www.amazon.in")
+    time.sleep(3)
+    
+    # এরপর আসল সার্চ পেজে যাবে
+    search_query = category.replace(' ', '+')
+    target_url = f"https://www.amazon.in/s?k={search_query}"
+    
+    driver.get(target_url)
+    time.sleep(5)
+
         
         # এখানে পেজ থেকে প্রোডাক্টের নাম, প্রাইস, লিংক এবং স্পেক্স ফেচ করার লজিক থাকবে
         # ডেমো হিসেবে ফরম্যাট স্ট্রাকচার নিচে দেওয়া হলো:
