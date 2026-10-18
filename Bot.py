@@ -5,19 +5,17 @@ from flask import Flask
 from threading import Thread
 from filters import DealCuratorMaster
 
-# Selenium এবং Webdriver Manager ইম্পোর্ট
+# Selenium ইম্পোর্ট
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Affiliate Bot with Clean Selenium is Running!"
+    return "Affiliate Bot with System Chromium is Running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -55,21 +53,24 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """রেলওয়ে লিনাক্স সার্ভারের জন্য ক্লিন ও স্টেবল ক্রোম কনফিগারেশন"""
+    """রেলওয়ে লিনাক্স সার্ভারের সিস্টেম ক্রোম কনফিগারেশন (নো ড্রাইভার ডাউনলোড ক্র্যাশ)"""
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-zygote")
+    options.add_argument("--single-process")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    return driver
+    # রেলওয়ের লিনাক্স সার্ভারের ডাইরেক্ট ক্রোম বাইনারি পাথ
+    options.binary_location = "/usr/bin/chromium"
     
+    driver = webdriver.Chrome(options=options)
+    return driver
+
 def fetch_products_with_selenium(category, budget_range):
-    print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using Selenium...")
+    print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using System Chromium...")
     
     driver = get_driver()
     products_list = []
