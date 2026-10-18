@@ -9,6 +9,8 @@ from filters import DealCuratorMaster
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+
 
 app = Flask(__name__)
 
@@ -51,7 +53,6 @@ CATEGORY_BUDGET_CYCLES = {
 
 curator = DealCuratorMaster()
 
-def get_driver():
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
@@ -65,10 +66,10 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # রেলওয়ে লিনাক্সের জন্য স্বয়ংক্রিয় ড্রাইভার ইনস্টলার
     service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
+    
     
 
 def fetch_products_with_selenium(category, budget_range):
