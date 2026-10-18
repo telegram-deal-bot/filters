@@ -52,21 +52,24 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """রেলওয়ে লিনাক্স সার্ভারের জন্য ডাইরেক্ট ক্রোম কনফিগারেশন (নো ক্র্যাশ)"""
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.utils import ChromeType
+
+def get_driver():
+    """রেলওয়ে লিনাক্স সার্ভারের জন্য webdriver-manager ভিত্তিক ক্রোম কনফিগারেশন"""
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--no-zygote")
-    options.add_argument("--single-process")
+    options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # রেলওয়ের লিনাক্স পাথ সরাসরি ব্যবহার করবে
-    options.binary_location = "/usr/bin/chromium"
-    
-    driver = webdriver.Chrome(options=options)
+    # রেলওয়ে লিনাক্সের জন্য স্বয়ংক্রিয় ড্রাইভার ইনস্টলার
+    service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
+    
 
 def fetch_products_with_selenium(category, budget_range):
     print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using Selenium...")
