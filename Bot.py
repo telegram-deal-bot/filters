@@ -5,19 +5,18 @@ from flask import Flask
 from threading import Thread
 from filters import DealCuratorMaster
 
-# Selenium এবং Webdriver Manager ইম্পোর্ট
+# Selenium ইম্পোর্ট
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Affiliate Bot with Robust WebdriverManager is Running!"
+    return "Affiliate Bot with System Chromium is Running Perfectly!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -55,22 +54,25 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """webdriver-manager ভিত্তিক রবাস্ট ক্রোম কনফিগারেশন"""
+    """রেলওয়ে লিনাক্স সিস্টেম ক্রোম এবং ড্রাইভার পাথ কনফিগারেশন (জিরো ক্র্যাশ)"""
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-zygote")
+    options.add_argument("--single-process")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # অটোমেটিক ড্রাইভার ইনস্টলার ও সার্ভিস সেটআপ
-    service = Service(ChromeDriverManager().install())
+    # রেলওয়ের লিনাক্স ক্রোম বাইনারি ও ড্রাইভারের ফিক্সড পাথ
+    options.binary_location = "/usr/bin/chromium"
+    service = Service(executable_path="/usr/bin/chromedriver")
+    
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
 def fetch_products_with_selenium(category, budget_range):
-    print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using WebdriverManager...")
+    print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using System Chromium...")
     
     driver = get_driver()
     products_list = []
