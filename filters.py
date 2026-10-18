@@ -1216,14 +1216,14 @@ class DealCuratorMaster:
             'smartwatch': SmartwatchAnalyzer(),
             'powerbank': PowerBankAnalyzer(),
             'wallet': WalletAnalyzer(),
-            'backpack': BackpackAnalyzer(),
+            'backpack': BagAnalyzer(),
             'perfume': PerfumeAnalyzer(),
             'grooming': GroomingAnalyzer(),
             'kitchenware': KitchenwareAnalyzer(),
-            'induction': InductionAnalyzer(),
-            'kettle': KettleAnalyzer(),
+            'induction': InductionCooktopAnalyzer(),
+            'kettle': ElectricKettleAnalyzer(),
             'scale': ScaleAnalyzer(),
-            'dispenser': DispenserAnalyzer(),
+            'dispenser': WaterDispenserPumpAnalyzer(),
             'ringlight': RingLightAnalyzer(),
             'striplight': StripLightAnalyzer(),
             'tripod': CreatorAccessoriesAnalyzer(), # Tripod & Mic
@@ -1231,7 +1231,7 @@ class DealCuratorMaster:
             'keyboard': MechanicalKeyboardAnalyzer()
         }
 
-    def evaluate_product(self, category_key, price, specs):
+        def evaluate_product(self, category_key, price, specs):
         """যেকোনো ক্যাটাগরির প্রোডাক্ট ডায়নামিকভাবে চেক করার মাস্টার মেথড"""
         if category_key not in self.analyzers:
             return False, [f"Error: Category '{category_key}' is not registered in the system."]
@@ -1241,18 +1241,35 @@ class DealCuratorMaster:
         # প্রতিটি অ্যানালাইজারের নির্দিষ্ট validate মেথড কল করা
         if hasattr(analyzer, 'validate'):
             return analyzer.validate(price, specs)
+        elif hasattr(analyzer, 'validate_wallet'):
+            return analyzer.validate_wallet(price, specs)
+        elif hasattr(analyzer, 'validate_bag'):
+            return analyzer.validate_bag(price, specs)
+        elif hasattr(analyzer, 'validate_features'):
+            return analyzer.validate_features(price, specs)
+        elif hasattr(analyzer, 'validate_speaker_features'):
+            return analyzer.validate_speaker_features(specs.get('usage_type', 'Indoor'), price, specs)
+        elif hasattr(analyzer, 'validate_headphone_features'):
+            return analyzer.validate_headphone_features(price, specs)
+        elif hasattr(analyzer, 'validate_sunglass_features'):
+            return analyzer.validate_sunglass_features(price, specs)
+        elif hasattr(analyzer, 'validate_watch_features'):
+            return analyzer.validate_watch_features(price, specs)
+        elif hasattr(analyzer, 'validate_smartwatch_features'):
+            return analyzer.validate_smartwatch_features(price, specs)
+        elif hasattr(analyzer, 'validate_powerbank_features'):
+            return analyzer.validate_powerbank_features(price, specs)
+        elif hasattr(analyzer, 'validate_perfume'):
+            return analyzer.validate_perfume(price, specs)
+        elif hasattr(analyzer, 'validate_grooming_item'):
+            return analyzer.validate_grooming_item(price, specs)
+        elif hasattr(analyzer, 'validate_kitchen_appliance'):
+            return analyzer.validate_kitchen_appliance(price, specs)
         elif category_key == 'tripod':
-            # ট্রিপড বা মাইকের আলাদা আলাদা মেথড হ্যান্ডেল করার জন্য
             if specs.get('is_mic', False):
                 return analyzer.validate_mic(price, specs)
             else:
                 return analyzer.validate_tripod(price, specs)
         
         return False, ["Validation method not found for this category."]
-
-    def register_new_category(self, category_key, analyzer_instance):
-        """ভবিষ্যতে খুব সহজেই নতুন ক্যাটাগরি বা মডিউল রানটাইমে এড করার ফাংশন"""
-        self.analyzers[category_key] = analyzer_instance
-        print(f"✅ Successfully registered new category: '{category_key}'")
-
-
+        
