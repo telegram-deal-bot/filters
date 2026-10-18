@@ -54,16 +54,27 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """রিয়েল ব্রাউজার কনফিগারেশন যা বট ডিটেকশন এড়াতে সাহায্য করবে"""
+    """রেলওয়ে লিনাক্স সার্ভারে ক্রোম ব্রাউজার ও ড্রাইভার সেফলি রান করার কনফিগারেশন"""
     options = Options()
     options.add_argument("--headless") # রেলওয়ে সার্ভারে চালানোর জন্য হেডলেস মোড
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--remote-debugging-port=9222")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    try:
+        # রেলওয়ের লিনাক্স এনভায়রনমেন্ট থেকে ক্রোম ব্যবহার করবে
+        options.binary_location = "/usr/bin/chromium"
+        service = Service("/usr/bin/chromedriver")
+        driver = webdriver.Chrome(service=service, options=options)
+    except Exception:
+        # লোকাল বা অন্য এনভায়রনমেন্টের জন্য ফলব্যাক
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        
     return driver
+    
 
 def fetch_products_with_selenium(category, budget_range):
     """
