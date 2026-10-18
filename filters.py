@@ -1212,7 +1212,7 @@ class DealCuratorMaster:
             'speaker': BluetoothSpeakerAnalyzer(),
             'headphone': HeadphoneAnalyzer(),
             'sunglass': SunglassAnalyzer(),
-            'watch': WatchAnalyzer(),
+            'watch': AnalogWatchAnalyzer(),
             'smartwatch': SmartwatchAnalyzer(),
             'powerbank': PowerBankAnalyzer(),
             'wallet': WalletAnalyzer(),
