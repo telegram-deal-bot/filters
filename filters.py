@@ -1209,7 +1209,7 @@ class DealCuratorMaster:
         # ভবিষ্যতে নতুন ক্যাটাগরি যোগ করতে হলে শুধু এখানে নতুন ক্লাস ইনস্ট্যান্স বসাতে হবে
         self.analyzers = {
             'tws': TWSAnalyzer(),
-            'speaker': SpeakerAnalyzer(),
+            'speaker': BluetoothSpeakerAnalyzer()
             'headphone': HeadphoneAnalyzer(),
             'sunglass': SunglassAnalyzer(),
             'watch': WatchAnalyzer(),
