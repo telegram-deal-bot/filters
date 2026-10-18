@@ -76,20 +76,18 @@ def fetch_products_with_selenium(category, budget_range):
     products_list = []
     
     try:
-            # প্রথমে অ্যামাজনের হোমপেজে যাবে যাতে বট ডিটেক্ট করে ব্লক না করে
-    driver.get("https://www.amazon.in")
-    time.sleep(3)
-    
-    # এরপর আসল সার্চ পেজে যাবে
-    search_query = category.replace(' ', '+')
-    target_url = f"https://www.amazon.in/s?k={search_query}"
-    
-    driver.get(target_url)
-    time.sleep(5)
-
+        # প্রথমে অ্যামাজনের হোমপেজে যাবে যাতে বট ডিটেক্ট করে ব্লক না করে
+        driver.get("https://www.amazon.in")
+        time.sleep(3)
+        
+        # এরপর আসল সার্চ পেজে যাবে
+        search_query = category.replace(' ', '+')
+        target_url = f"https://www.amazon.in/s?k={search_query}"
+        
+        driver.get(target_url)
+        time.sleep(5) # পেজ পুরোপুরি লোড হওয়ার জন্য সময় দেওয়া
         
         # এখানে পেজ থেকে প্রোডাক্টের নাম, প্রাইস, লিংক এবং স্পেক্স ফেচ করার লজিক থাকবে
-        # ডেমো হিসেবে ফরম্যাট স্ট্রাকচার নিচে দেওয়া হলো:
         products_list = [
             {
                 'name': f'Sample Real Amazon {category.upper()} Pro',
@@ -157,7 +155,7 @@ def bot_main_loop():
                             send_telegram_message(message)
                             print(f"Posted to Telegram: {best_deal['name']}")
                     
-                    time.sleep(1800) # প্রতি সাইকেলের মাঝে ৩০ মিনিটের বিরতি
+                    time.sleep(600) # প্রতি সাইকেলের মাঝে ১০ মিনিটের বিরতি (সার্ভার সেফ রাখতে)
                     
                 except Exception as e:
                     print(f"Error in bot loop for {cat}: {e}")
@@ -169,3 +167,4 @@ if __name__ == "__main__":
     flask_thread.start()
     
     bot_main_loop()
+    
