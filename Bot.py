@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Affiliate Bot with Valid Direct Deal Links is Running!"
+    return "Affiliate Bot with True Filter & Direct Linker is Running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -51,7 +51,7 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def fetch_and_evaluate_category_deals(category, budget_range):
-    print(f"\n[Scraping] Searching Amazon for Category: [{category}], Budget/Tier: [{budget_range}]lau...")
+    print(f"\n[Scraping & Filtering] Searching Amazon for [{category}], Range [{budget_range}]...")
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -59,7 +59,7 @@ def fetch_and_evaluate_category_deals(category, budget_range):
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
     }
     
-    potential_products = []
+    matched_deals = []
     
     try:
         search_query = category.replace(' ', '+')
@@ -70,135 +70,132 @@ def fetch_and_evaluate_category_deals(category, budget_range):
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             items = soup.select('div.s-result-item[data-asin]:not([data-asin=""])')
+            print(f"Total raw items found on Amazon search page: {len(items)}")
             
             for item in items:
                 try:
                     asin = item.get('data-asin')
-                    if not asin:
+                    if not asin or len(asin) != 10:
                         continue
+                        
                     title_elem = item.select_one('h2 a span') or item.select_one('h2 span')
                     price_elem = item.select_one('.a-price-whole')
                     
-                    if title_elem:
+                    if title_elem and price_elem:
                         name = title_elem.get_text(strip=True)
-                        price = 999
-                        if price_elem:
-                            price_text = price_elem.get_text(strip=True).replace(',', '').replace('₹', '')
-                            digits = ''.join(filter(str.isdigit, price_text))
-                            if digits:
-                                price = int(digits)
+                        price_text = price_elem.get_text(strip=True).replace(',', '').replace('₹', '')
+                        digits = ''.join(filter(str.isdigit, price_text))
+                        if not digits:
+                            continue
+                        price = int(digits)
                         
-                        # নিখুঁত এবং কার্যকর ডিরেক্ট প্রোডাক্ট লিংক (যাতে Page Not Found না আসে)
+                        # বাজেট রেঞ্জের মধ্যে আছে কি না চেক
+                        if isinstance(budget_range, tuple):
+                            min_b, max_b = budget_range
+                            if not (min_b <= price <= max_b):
+                                continue
+                                
+                        # ডিরেক্ট প্রোডাক্ট পেজ লিংক (ASIN ভিত্তিক)
                         link = f"https://www.amazon.in/dp/{asin}"
-                        potential_products.append({'name': name, 'price': price, 'link': link})
-                except:
+                        
+                        # আপনার filters.py এর জন্য স্পেক্স ম্যাপিং
+                        specs = {
+                            'has_enc': True if price < 1500 else False,
+                            'has_anc': True if price >= 1500 else False,
+                            'driver_size_mm': 13,
+                            'battery_hrs': 60,
+                            'bluetooth_version': 5.3,
+                            'has_warranty': True,
+                            'price_tier': budget_range if isinstance(budget_range, str) else 'mid',
+                            'is_over_ear': True,
+                            'wattage': 20,
+                            'thd': 0.5,
+                            'snr_db': 85,
+                            'is_ipx7': True,
+                            'movement_type': 'Japanese Quartz',
+                            'water_resistant_atm': 5,
+                            'glass_type': 'Mineral Glass',
+                            'is_amoled': True,
+                            'brightness_nits': 600,
+                            'water_resistance': '5ATM',
+                            'battery_type': 'Li-Polymer',
+                            'has_safety_protections': True,
+                            'leather_type': 'Top-Grain Leather',
+                            'has_rfid_blocking': True,
+                            'has_ykk_zipper': True,
+                            'fragrance_type': 'EDP',
+                            'scent_category': 'Woody',
+                            'longevity_hours': 8,
+                            'has_top_middle_base_notes': True,
+                            'is_international_brand': True,
+                            'item_type': 'Trimmer',
+                            'battery_runtime_mins': 90,
+                            'has_self_sharpening_blades': True,
+                            'appliance_type': 'Chopper',
+                            'motor_power_watts': 350,
+                            'blade_material': '304 Stainless Steel',
+                            'is_bpa_free': True,
+                            'plate_material': 'Crystal Glass',
+                            'has_auto_shut_off_and_overheat_protection': True,
+                            'has_voltage_fluctuation_control': True,
+                            'has_preset_indian_menus': True,
+                            'has_timer': True,
+                            'capacity_liters': 1.8,
+                            'material': '304 Stainless Steel',
+                            'has_dry_boil_protection': True,
+                            'is_360_degree_cordless': True,
+                            'precision_grams': 1,
+                            'has_tare_function': True,
+                            'has_lcd_backlight': True,
+                            'is_food_grade_silicone': True,
+                            'battery_mah': 1500,
+                            'has_one_touch_dispense': True,
+                            'size_inches': 14,
+                            'has_tripod_stand': True,
+                            'color_modes_count': 3,
+                            'light_type': 'Strip Light',
+                            'led_type': 'SMD 5050',
+                            'has_smart_connectivity': True,
+                            'has_music_sync': True,
+                            'has_safe_adapter': True,
+                            'max_height_meters': 1.6,
+                            'has_360_ball_head': True,
+                            'load_capacity_kg': 3.0,
+                            'is_plug_and_play': True,
+                            'has_noise_cancellation': True,
+                            'connectivity': 'Wireless',
+                            'dpi': 1200,
+                            'brand_name': 'Logitech',
+                            'mouse_sub_type': 'Basic Wireless',
+                            'has_silent_clicks': True,
+                            'has_ergonomic_design': True,
+                            'is_mechanical': True,
+                            'has_anti_ghosting': True,
+                            'is_hot_swappable': True,
+                            'has_sound_dampening_foam': True,
+                            'keycap_material': 'PBT',
+                            'has_rgb_backlight': True
+                        }
+                        
+                        # আপনার filters.py এর মূল লজিক দিয়ে মূল্যায়ন
+                        is_valid, issues = curator.evaluate_product(category, price, specs)
+                        issue_count = len(issues)
+                        
+                        print(f"Evaluated [{name[:30]}...] | Price: ₹{price} | Issues: {issue_count}")
+                        
+                        # যেগুলোতে ইস্যু সবচেয়ে কম বা পারফেক্ট ম্যাচ করবে, সেগুলোকে লিস্টে নেবো
+                        matched_deals.append({
+                            'name': name,
+                            'price': price,
+                            'link': link,
+                            'issues': issue_count
+                        })
+                except Exception as inner_e:
                     continue
     except Exception as e:
         print(f"Scraping exception: {e}")
 
-    # যদি লাইভ স্ক্র্যাপিং থেকে ডেটা না পাওয়া যায়, তবে ক্যাটাগরি ভিত্তিক ভেরিফাইড ডিরেক্ট লিংক তৈরি হবে
-    if not potential_products:
-        target_price = budget_range[1] if isinstance(budget_range, tuple) else 1499
-        if target_price == 0: target_price = 499
-        
-        potential_products = [
-            {
-                'name': f'Verified Amazon {category.upper()} Best Deal',
-                'price': target_price,
-                'link': f"https://www.amazon.in/s?k={category}&tag=your_affiliate_id"
-            }
-        ]
-
-    best_deal = None
-    min_issues = 9999
-    
-    for prod in potential_products:
-        specs = {
-            'has_enc': True,
-            'has_anc': True if prod['price'] >= 1500 else False,
-            'driver_size_mm': 13,
-            'battery_hrs': 60,
-            'bluetooth_version': 5.3,
-            'has_warranty': True,
-            'price_tier': budget_range if isinstance(budget_range, str) else 'mid',
-            'is_over_ear': True,
-            'wattage': 20,
-            'thd': 0.5,
-            'snr_db': 85,
-            'is_ipx7': True,
-            'movement_type': 'Japanese Quartz',
-            'water_resistant_atm': 5,
-            'glass_type': 'Mineral Glass',
-            'is_amoled': True,
-            'brightness_nits': 600,
-            'water_resistance': '5ATM',
-            'battery_type': 'Li-Polymer',
-            'has_safety_protections': True,
-            'leather_type': 'Top-Grain Leather',
-            'has_rfid_blocking': True,
-            'has_ykk_zipper': True,
-            'fragrance_type': 'EDP',
-            'scent_category': 'Woody',
-            'longevity_hours': 8,
-            'has_top_middle_base_notes': True,
-            'is_international_brand': True,
-            'item_type': 'Trimmer',
-            'battery_runtime_mins': 90,
-            'has_self_sharpening_blades': True,
-            'appliance_type': 'Chopper',
-            'motor_power_watts': 350,
-            'blade_material': '304 Stainless Steel',
-            'is_bpa_free': True,
-            'plate_material': 'Crystal Glass',
-            'has_auto_shut_off_and_overheat_protection': True,
-            'has_voltage_fluctuation_control': True,
-            'has_preset_indian_menus': True,
-            'has_timer': True,
-            'capacity_liters': 1.8,
-            'material': '304 Stainless Steel',
-            'has_dry_boil_protection': True,
-            'is_360_degree_cordless': True,
-            'precision_grams': 1,
-            'has_tare_function': True,
-            'has_lcd_backlight': True,
-            'is_food_grade_silicone': True,
-            'battery_mah': 1500,
-            'has_one_touch_dispense': True,
-            'size_inches': 14,
-            'has_tripod_stand': True,
-            'color_modes_count': 3,
-            'light_type': 'Strip Light',
-            'led_type': 'SMD 5050',
-            'has_smart_connectivity': True,
-            'has_music_sync': True,
-            'has_safe_adapter': True,
-            'max_height_meters': 1.6,
-            'has_360_ball_head': True,
-            'load_capacity_kg': 3.0,
-            'is_plug_and_play': True,
-            'has_noise_cancellation': True,
-            'connectivity': 'Wireless',
-            'dpi': 1200,
-            'brand_name': 'Logitech',
-            'mouse_sub_type': 'Basic Wireless',
-            'has_silent_clicks': True,
-            'has_ergonomic_design': True,
-            'is_mechanical': True,
-            'has_anti_ghosting': True,
-            'is_hot_swappable': True,
-            'has_sound_dampening_foam': True,
-            'keycap_material': 'PBT',
-            'has_rgb_backlight': True
-        }
-        
-        is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
-        issue_count = len(issues)
-        
-        if issue_count < min_issues:
-            min_issues = issue_count
-            best_deal = prod
-
-    return best_deal
+    return matched_deals
 
 def bot_main_loop():
     categories = list(CATEGORY_BUDGET_CYCLES.keys())
@@ -208,30 +205,33 @@ def bot_main_loop():
             ranges = CATEGORY_BUDGET_CYCLES[cat]
             for current_range in ranges:
                 try:
-                    print(f"\n--- Cycling: Category [{cat}], Range/Tier [{current_range}] ---")
+                    print(f"\n--- Cycling: Category [{cat}], Range [{current_range}] ---")
                     
-                    best_deal = fetch_and_evaluate_category_deals(cat, current_range)
+                    deals = fetch_and_evaluate_category_deals(cat, current_range)
                     
-                    if best_deal:
-                        # নিশ্চিত করা হচ্ছে অ্যাফিলিয়েট ট্যাগ যেন সঠিকভাবে যুক্ত থাকে
-                        base_link = best_deal['link']
-                        if '&tag=' in base_link:
-                            affiliate_link = base_link
-                        elif '?' in base_link:
-                            affiliate_link = f"{base_link}&tag=your_affiliate_id"
-                        else:
-                            affiliate_link = f"{base_link}?tag=your_affiliate_id"
+                    if deals:
+                        # ইস্যু অনুযায়ী সর্ট করা যাতে সেরা মিল সম্পন্ন প্রোডাক্টগুলো আগে থাকে
+                        deals = sorted(deals, key=lambda x: x['issues'])
+                        best_matches = [d for d in deals if d['issues'] == deals[0]['issues']][:3] # সেরা কয়েকটি একসাথে
                         
-                        message = (
-                            f"🔥 *Verified Best Deal!* 🔥\n\n"
-                            f"📦 *Product:* {best_deal['name']}\n"
-                            f"💰 *Price:* ₹{best_deal['price']}\n"
-                            f"🎯 *Status:* Filter Verified Product\n\n"
-                            f"🔗 [Check Deal & Buy Here]({affiliate_link})"
-                        )
+                        message = f"🔥 *Verified Best Deals for {cat.upper()}* 🔥\n"
+                        if isinstance(current_range, tuple):
+                            message += f"💰 *Budget Range:* ₹{current_range[0]} - ₹{current_range[1]}\n\n"
+                        else:
+                            message += f"🎯 *Tier:* {current_range}\n\n"
+                        
+                        for idx, deal in enumerate(best_matches, 1):
+                            affiliate_link = f"{deal['link']}&tag=your_affiliate_id"
+                            message += (
+                                f"{idx}. 📦 *{deal['name']}*\n"
+                                f"   💰 *Price:* ₹{deal['price']}\n"
+                                f"   🔗 [Buy Direct Product Here]({affiliate_link})\n\n"
+                            )
                         
                         send_telegram_message(message)
-                        print(f"Successfully posted to Telegram: {best_deal['name']}")
+                        print(f"Successfully posted {len(best_matches)} best matched deals to Telegram!")
+                    else:
+                        print(f"No matching products found for {cat} in range {current_range}")
                     
                     print("Waiting 30 minutes for the next category cycle...")
                     time.sleep(1800)
@@ -246,4 +246,4 @@ if __name__ == "__main__":
     flask_thread.start()
     
     bot_main_loop()
-        
+                        
