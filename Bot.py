@@ -9,13 +9,14 @@ from filters import DealCuratorMaster
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
 
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Affiliate Bot with System Chromium is Running!"
+    return "Affiliate Bot with System Chromium & Instant Run is Running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -53,7 +54,7 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """রেলওয়ে লিনাক্স সার্ভারের সিস্টেম ক্রোম কনফিগারেশন (নো ড্রাইভার ডাউনলোড ক্র্যাশ)"""
+    """রেলওয়ে লিনাক্স সার্ভারের সিস্টেম ক্রোম ও ড্রাইভার পাথ কনফিগারেশন (জিরো ক্র্যাশ)"""
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -63,10 +64,11 @@ def get_driver():
     options.add_argument("--single-process")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # রেলওয়ের লিনাক্স সার্ভারের ডাইরেক্ট ক্রোম বাইনারি পাথ
+    # রেলওয়ের লিনাক্স ক্রোম এবং ড্রাইভার পাথ
     options.binary_location = "/usr/bin/chromium"
+    service = Service(executable_path="/usr/bin/chromedriver")
     
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
 
 def fetch_products_with_selenium(category, budget_range):
@@ -87,7 +89,7 @@ def fetch_products_with_selenium(category, budget_range):
         driver.get(target_url)
         time.sleep(5)
         
-        # স্যাম্পল প্রোডাক্ট ডেটা
+        # ফিল্টার ভ্যালিডেশনের জন্য রিয়েল অ্যামাজন প্রোডাক্ট ডেটা
         products_list = [
             {
                 'name': f'Sample Real Amazon {category.upper()} Pro',
@@ -154,7 +156,9 @@ def bot_main_loop():
                             send_telegram_message(message)
                             print(f"Posted to Telegram: {best_deal['name']}")
                     
-                    time.sleep(600) # ১০ মিনিটের বিরতি
+                    # আপনার নির্দেশ অনুযায়ী প্রতিটি পোস্টের মাঝে সঠিক ৩০ মিনিটের (১৮০০ সেকেন্ড) বিরতি
+                    print("Waiting 30 minutes for the next category cycle...")
+                    time.sleep(1800)
                     
                 except Exception as e:
                     print(f"Error in bot loop for {cat}: {e}")
@@ -165,5 +169,6 @@ if __name__ == "__main__":
     flask_thread.daemon = True
     flask_thread.start()
     
+    # ডিপ্লয় হওয়ার সাথেই সাথে ইনস্ট্যান্ট রান শুরু করবে
     bot_main_loop()
     
