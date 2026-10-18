@@ -1238,7 +1238,6 @@ class DealCuratorMaster:
         
         analyzer = self.analyzers[category_key]
         
-        # প্রতিটি অ্যানালাইজারের নির্দিষ্ট validate মেথড কল করা
         if hasattr(analyzer, 'validate'):
             return analyzer.validate(price, specs)
         elif hasattr(analyzer, 'validate_wallet'):
@@ -1272,4 +1271,8 @@ class DealCuratorMaster:
                 return analyzer.validate_tripod(price, specs)
         
         return False, ["Validation method not found for this category."]
+
+    def register_new_category(self, category_key, analyzer_instance):
+        self.analyzers[category_key] = analyzer_instance
+        print(f"✅ Successfully registered new category: '{category_key}'")
         
