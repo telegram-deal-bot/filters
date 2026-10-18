@@ -5,11 +5,12 @@ from flask import Flask
 from threading import Thread
 from filters import DealCuratorMaster
 
-# Selenium ইম্পোর্ট
+# Selenium এবং Webdriver Manager ইম্পোর্ট
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 app = Flask(__name__)
@@ -67,8 +68,6 @@ def get_driver():
     driver = webdriver.Chrome(service=service, options=options)
     return driver
     
-    
-
 def fetch_products_with_selenium(category, budget_range):
     print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using Selenium...")
     
