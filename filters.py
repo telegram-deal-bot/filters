@@ -1205,8 +1205,6 @@ print("Status: ✅ Perfect Match!" if k_val else f"Status: ❌ Failed: {k_res}")
 
 class DealCuratorMaster:
     def __init__(self):
-        # সমস্ত ক্যাটাগরির ভ্যালিডেটর বা মডিউলগুলোকে এক জায়গায় রেজিস্টার করা হলো
-        # ভবিষ্যতে নতুন ক্যাটাগরি যোগ করতে হলে শুধু এখানে নতুন ক্লাস ইনস্ট্যান্স বসাতে হবে
         self.analyzers = {
             'tws': TWSAnalyzer(),
             'speaker': BluetoothSpeakerAnalyzer(),
@@ -1222,17 +1220,16 @@ class DealCuratorMaster:
             'kitchenware': KitchenwareAnalyzer(),
             'induction': InductionCooktopAnalyzer(),
             'kettle': ElectricKettleAnalyzer(),
-            'scale': ScaleAnalyzer(),
+            'scale': DigitalScaleAnalyzer(),
             'dispenser': WaterDispenserPumpAnalyzer(),
-            'ringlight': RingLightAnalyzer(),
-            'striplight': StripLightAnalyzer(),
-            'tripod': CreatorAccessoriesAnalyzer(), # Tripod & Mic
+            'ringlight': RingLightBudgetAnalyzer(),
+            'striplight': SmartLightingAnalyzer(),
+            'tripod': CreatorAccessoriesAnalyzer(),
             'mouse': ComputerMouseAnalyzer(),
             'keyboard': MechanicalKeyboardAnalyzer()
         }
 
-        def evaluate_product(self, category_key, price, specs):
-        """যেকোনো ক্যাটাগরির প্রোডাক্ট ডায়নামিকভাবে চেক করার মাস্টার মেথড"""
+    def evaluate_product(self, category_key, price, specs):
         if category_key not in self.analyzers:
             return False, [f"Error: Category '{category_key}' is not registered in the system."]
         
