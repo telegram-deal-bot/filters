@@ -5,18 +5,16 @@ from flask import Flask
 from threading import Thread
 from filters import DealCuratorMaster
 
-# Selenium ইম্পোর্ট (বট ডিটেকশন এড়াতে এবং রিয়েল ব্রাউজার সেশন ব্যবহার করতে)
+# Selenium ইম্পোর্ট
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Affiliate Bot with Selenium & Modular Filters is Running!"
+    return "Affiliate Bot with Clean Selenium is Running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -54,40 +52,30 @@ CATEGORY_BUDGET_CYCLES = {
 curator = DealCuratorMaster()
 
 def get_driver():
-    """রেলওয়ে লিনাক্স সার্ভারে ক্রোম ব্রাউজার ও ড্রাইভার সেফলি রান করার কনফিগারেশন"""
+    """রেলওয়ে লিনাক্স সার্ভারের জন্য ডাইরেক্ট ক্রোম কনফিগারেশন (নো ক্র্যাশ)"""
     options = Options()
-    options.add_argument("--headless") # রেলওয়ে সার্ভারে চালানোর জন্য হেডলেস মোড
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222")
-    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-zygote")
+    options.add_argument("--single-process")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    try:
-        # রেলওয়ের লিনাক্স এনভায়রনমেন্ট থেকে ক্রোম ব্যবহার করবে
-        options.binary_location = "/usr/bin/chromium"
-        service = Service("/usr/bin/chromedriver")
-        driver = webdriver.Chrome(service=service, options=options)
-    except Exception:
-        # লোকাল বা অন্য এনভায়রনমেন্টের জন্য ফলব্যাক
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        
-    return driver
+    # রেলওয়ের লিনাক্স পাথ সরাসরি ব্যবহার করবে
+    options.binary_location = "/usr/bin/chromium"
     
+    driver = webdriver.Chrome(options=options)
+    return driver
 
 def fetch_products_with_selenium(category, budget_range):
-    """
-    আইডিয়া ২ অনুযায়ী: Selenium ব্রাউজার ব্যবহার করে অ্যামাজন/ফ্লিপকার্ট সার্চ পেজ ভিজিট করবে 
-    এবং আপনার লগইন করা সেশন বা কুকিজের মাধ্যমে রিয়েল প্রোডাক্ট ডেটা তুলবে।
-    """
     print(f"Fetching products for Category: {category} in Budget/Tier: {budget_range} using Selenium...")
     
     driver = get_driver()
     products_list = []
     
     try:
-        # প্রথমে অ্যামাজনের হোমপেজে যাবে যাতে বট ডিটেক্ট করে ব্লক না করে
+        # প্রথমে অ্যামাজনের হোমপেজে যাবে
         driver.get("https://www.amazon.in")
         time.sleep(3)
         
@@ -96,9 +84,9 @@ def fetch_products_with_selenium(category, budget_range):
         target_url = f"https://www.amazon.in/s?k={search_query}"
         
         driver.get(target_url)
-        time.sleep(5) # পেজ পুরোপুরি লোড হওয়ার জন্য সময় দেওয়া
+        time.sleep(5)
         
-        # এখানে পেজ থেকে প্রোডাক্টের নাম, প্রাইস, লিংক এবং স্পেক্স ফেচ করার লজিক থাকবে
+        # স্যাম্পল প্রোডাক্ট ডেটা
         products_list = [
             {
                 'name': f'Sample Real Amazon {category.upper()} Pro',
@@ -123,7 +111,6 @@ def fetch_products_with_selenium(category, budget_range):
     return products_list
 
 def evaluate_and_select_best_product(category, products):
-    """সবচেয়ে কম ত্রুটি বা বেশি স্পেক্সযুক্ত সেরা প্রোডাক্ট বেছে নেওয়ার স্কোরিং লজিক"""
     best_product = None
     min_issues_count = 9999
 
@@ -166,7 +153,7 @@ def bot_main_loop():
                             send_telegram_message(message)
                             print(f"Posted to Telegram: {best_deal['name']}")
                     
-                    time.sleep(600) # প্রতি সাইকেলের মাঝে ১০ মিনিটের বিরতি (সার্ভার সেফ রাখতে)
+                    time.sleep(600) # ১০ মিনিটের বিরতি
                     
                 except Exception as e:
                     print(f"Error in bot loop for {cat}: {e}")
