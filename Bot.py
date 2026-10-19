@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Advanced Multi-Stage Product Deep Scraper is Active!"
+    return "Advanced Verified Product Multi-Stage Scraper is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -29,7 +29,7 @@ def send_telegram_message(text):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Telegram sending error: {e}")
 
 CATEGORY_BUDGET_CYCLES = {
     'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500)],
@@ -45,15 +45,15 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
 ]
 
-def human_delay(min_sec=2.0, max_sec=5.0):
-    """কার্সার মুভমেন্ট থিওরি: মানুষের মতো করে ধীরে ধীরে পেজ স্ক্রল বা পড়ার বিরতি নকল করা"""
+def human_delay(min_sec=3.0, max_sec=6.0):
+    """কার্সার মুভমেন্ট থিওরি: মানুষের স্ক্রলিং ও রিডিং স্পিড নকল করার বিলম্ব"""
     time.sleep(random.uniform(min_sec, max_sec))
 
 def extract_features_from_text(text):
-    """প্রোডাক্টের ভেতরের ডেসক্রিপশন এবং বুলেট পয়েন্ট থেকে স্পেক্স খুঁজে বের করার লজিক"""
+    """প্রোডাক্ট পেজের ভেতরের আসল বড় ডেসক্রিপশন এবং বুলেট থেকে ফিচার খোঁজার লজিক"""
     t_low = text.lower()
     return {
-        'has_enc': any(x in t_low for x in ['enc', 'environmental noise', 'clear call']),
+        'has_enc': any(x in t_low for x in ['enc', 'environmental noise', 'clear call', 'noise reduction']),
         'has_anc': any(x in t_low for x in ['anc', 'active noise', 'hybrid anc']),
         'driver_size_mm': 13 if '13mm' in t_low or '13 mm' in t_low else 10,
         'battery_hrs': 60 if '60h' in t_low or '60 hours' in t_low else 40,
@@ -66,15 +66,15 @@ def extract_features_from_text(text):
     }
 
 def deep_visit_product(asin, category, price, headers):
-    """সুনির্দিষ্ট প্রোডাক্ট পেজের ভেতরে ঢুকে ডেসক্রিপশন এবং বুলেট পয়েন্ট স্ক্র্যাপ করার মেথড"""
+    """১০০% ডাইরেক্ট প্রোডাক্ট পেজের ভেতরে ঢুকে ডেসক্রিপশন স্ক্র্যাপ করার মেথড"""
     url = f"https://amazon.in{asin}"
     try:
-        human_delay(3.0, 6.0) # মানুষের মতো রিডিং ডিলে
+        human_delay(3.5, 6.5) # মানুষের মতো র্যান্ডম পেজ রিডিং ডিলে
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, 'html.parser')
             
-            # প্রোডাক্টের ভেতরের ডেসক্রিপশন এবং ফিচারের অংশগুলো রিড করা
+            # বুলেট পয়েন্ট এবং প্রোডাক্ট বিবরণী এক জায়গায় করা
             bullet_points = soup.select("#feature-bullets ul li span")
             description_text = " ".join([bp.get_text(strip=True) for bp in bullet_points])
             
@@ -87,10 +87,24 @@ def deep_visit_product(asin, category, price, headers):
             return len(issues)
     except Exception:
         pass
-    return 99 # ফেইল করলে হাই ইস্যু কাউন্ট দেওয়া হবে যাতে এটি ফিল্টারে বাদ পড়ে
+    return 99 # কোনো সমস্যা হলে বড় নাম্বার দেওয়া যাতে সেটি সেরা প্রোডাক্টের রেস থেকে বাদ পড়ে
 
 def fetch_and_select_ultimate_deal(category, budget_range):
-    print(f"\n[Crawl Start] Category: {category}, Range: {budget_range}")
+    # ইউআরএল ফিক্সিং: সম্পূর্ণ আলাদা প্যারামিটার স্ট্রাকচার তৈরি করা হলো যাতে .intws টাইপো হওয়ার কোনো সুযোগ না থাকে
+    clean_category = str(category).strip().replace(' ', '+')
+    target_search_url = f"https://amazon.in"
+    
+    # ডোমেন এবং কুয়েরিকে আলাদা প্যারামিটার (params) হিসেবে পাঠানো হচ্ছে যাতে ব্যাকএন্ডে ইউআরএল সঠিকভাবে তৈরি হয়
+    search_params = {
+        'k': clean_category
+    }
+    
+    if isinstance(budget_range, tuple):
+        min_p, max_p = budget_range
+        search_params['rh'] = f"p_36:{min_p}00-{max_p}00"
+
+    print(f"\n[Crawl Start] Requesting: {target_search_url} with params: {search_params}")
+    
     headers = {
         "User-Agent": random.choice(USER_AGENTS),
         "Accept-Language": "en-US,en;q=0.9",
@@ -99,12 +113,12 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     }
     
     try:
-        search_query = category.strip().replace(' ', '+')
-        url = f"https://amazon.in{search_query}"
-        human_delay(2.0, 4.0)
-        response = requests.get(url, headers=headers, timeout=20)
+        human_delay(2.5, 5.0)
+        # params ডিকশনারি ব্যবহারের কারণে ডোমেন নেম সম্পূর্ণ সুরক্ষিত থাকবে
+        response = requests.get(target_search_url, params=search_params, headers=headers, timeout=20)
         
         if response.status_code != 200:
+            print(f"[Warning] Amazon main page search returned status: {response.status_code}")
             return None
             
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -112,7 +126,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         
         valid_items_pool = []
         
-        # ধাপ ১: আগে বাইরে থেকে শুধু প্রাইস মিললে তবেই পুলে নেওয়া হবে (বাজেটের বাইরের প্রোডাক্ট ফিল্টার আউট)
+        # ধাপ ১: কঠোর প্রাইস এবং অ্যাসিন আইডি ফিল্টারিং (বাইরে থেকে দাম না মিললে প্রোডাক্টটি স্কিপ করা হবে)
         for item in items:
             asin = item.get('data-asin')
             if not asin or len(asin) != 10:
@@ -126,47 +140,45 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 price_text = price_elem.get_text(strip=True).replace(',', '').replace('₹', '')
                 price = int(''.join(filter(str.isdigit, price_text)))
                 
-                # কঠোর প্রাইস ফিল্টার চেক
                 if isinstance(budget_range, tuple):
                     min_b, max_b = budget_range
                     if not (min_b <= price <= max_b):
-                        continue # বাজেট না মিললে প্রোডাক্টটি ভিজিটই করা হবে না
+                        continue # বাজেট রেঞ্জ ফিল্টার আউট
                         
                 valid_items_pool.append({'asin': asin, 'name': name, 'price': price})
                 
         if not valid_items_pool:
+            print(f"[Info] No items matched the initial price requirements outside.")
             return None
             
-        # ধাপ ২: ৫টি করে প্রোডাক্ট ৫টি আলাদা আলাদা ব্যাচে ভাগ করা (আপনার ৫x৫ থিওরি)
+        # ধাপ ২: ৫টি করে প্রোডাক্টের ব্যাচ সাজানো এবং প্রতিটি প্রোডাক্ট পেজ আলাদা করে ডিপ ভিজিট করা
         ultimate_round_contenders = []
         chunk_size = 5
         batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:5]
         
         for batch_idx, batch in enumerate(batches, 1):
-            print(f"-> Processing Batch {batch_idx}/5 (Size: {len(batch)} items)")
+            print(f" -> Checking Batch {batch_idx}/5 (Size: {len(batch)} items) with Human Emulation Theory...")
             batch_evaluated = []
             
             for prod in batch:
-                # ডাইরেক্ট প্রোডাক্ট পেজের ডেসক্রিপশন পড়তে ভেতরে ঢোকা
+                # সুনির্দিষ্ট প্রোডাক্টের ভেতরে ঢোকা এবং বিবরণী বিশ্লেষণ করা
                 issues_count = deep_visit_product(prod['asin'], category, prod['price'], headers)
                 prod['issues_count'] = issues_count
                 batch_evaluated.append(prod)
                 
             if batch_evaluated:
-                # এই ব্যাচের সবথেকে ভালো প্রোডাক্টটি বেছে নেওয়া (সবচেয়ে কম issues_count)
+                # এই নির্দিষ্ট ৫টির ব্যাচের মধ্যে সবথেকে কম ইস্যু থাকা বেস্ট প্রোডাক্টটি বেছে নেওয়া
                 best_in_batch = sorted(batch_evaluated, key=lambda x: x['issues_count'])[0]
                 ultimate_round_contenders.append(best_in_batch)
                 
-        # ধাপ ৩: ৫টি ব্যাচের ৫টি সেরা প্রোডাক্টের মধ্যে ফাইনাল লড়াই (সেরার সেরা নির্বাচন)
+        # ধাপ ৩: চূড়ান্ত উইনার সিলেকশন (৫টি ব্যাচের ৫টি সেরা প্রোডাক্টের মধ্যে অন্তিম তুলনা)
         if ultimate_round_contenders:
             final_winner = sorted(ultimate_round_contenders, key=lambda x: x['issues_count'])[0]
-            
-            # ১০০% ডাইরেক্ট সুনির্দিষ্ট প্রোডাক্ট বাই লিংক জেনারেশন
             final_winner['link'] = f"https://amazon.in{final_winner['asin']}?tag={AFFILIATE_TAG}"
             return final_winner
             
     except Exception as e:
-        print(f"Critical workflow error: {e}")
+        print(f"Critical execution error inside main script: {e}")
     return None
 
 def bot_main_loop():
@@ -183,19 +195,19 @@ def bot_main_loop():
                             f"🏆 *সেরার সেরা ফিল্টার্ড ডিল\!* 🏆\n\n"
                             f"📦 *প্রোডাক্ট:* {winner_deal['name'][:55]}...\n"
                             f"💰 *দাম:* ₹{winner_deal['price']}\n"
-                            f"🎯 *ম্যাচ কোয়ালিটি:* ৫টি ব্যাচ যাচাই করে সর্বোচ্চ স্কোরপ্রাপ্ত।\n\n"
+                            f"🎯 *ম্যাচ কোয়ালিটি:* ৫টি ব্যাচ গভীরভাবে স্ক্যান করে ফিল্টারের সাথে সর্বোচ্চ মিল পাওয়া গেছে।\n\n"
                             f"🛒 *সরাসরি কিনতে নিচের লিংকে ক্লিক করুন (Buy Now পেজ):* \n"
                             f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({winner_deal['link']})"
                         )
                         send_telegram_message(message)
-                        print(f"[Success] Ultimate verified direct deal posted for {cat}!")
+                        print(f"[Success] Ultimate verified direct deal posted for {cat} to Telegram!")
                     else:
-                        print(f"[Skip] No optimal verified product found for {cat} in range {current_range}.")
+                        print(f"[Skip] No optimal verified product found for {cat} in range {current_range} after deep analysis.")
                         
                     print("Sleeping for 30 minutes before next category crawl...")
                     time.sleep(1800)
                 except Exception as e:
-                    print(f"Loop error: {e}")
+                    print(f"Loop runtime error: {e}")
                     time.sleep(60)
 
 if __name__ == "__main__":
