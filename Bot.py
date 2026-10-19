@@ -106,7 +106,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
 
     print(f"\n[Crawl Start] Requesting: {target_search_url} with params: {search_params}")
     
-        headers = {
+    headers = {
         "User-Agent": random.choice(USER_AGENTS),
         "Accept-Language": "en-US,en;q=0.9,en;q=0.8",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
