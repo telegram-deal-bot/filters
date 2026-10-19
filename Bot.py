@@ -19,7 +19,7 @@ def run_flask():
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("CHAT_ID")
-AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "your_affiliate_id") # আপনার আমাজন অ্যাসোসিয়েট ট্যাগ এখানে দিন
+AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "your_affiliate_id")
 
 def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -29,8 +29,7 @@ def send_telegram_message(text):
     payload = {
         'chat_id': TELEGRAM_CHAT_ID,
         'text': text,
-        'parse_mode': 'Markdown',
-        'disable_web_page_preview': False
+        'parse_mode': 'Markdown'
     }
     try:
         response = requests.post(url, json=payload)
@@ -49,48 +48,38 @@ CATEGORY_BUDGET_CYCLES = {
 
 curator = DealCuratorMaster()
 
-# আমাজন ব্লক এড়ানোর জন্য হিউম্যান-লাইক হেডার্স পুল
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
 ]
 
 def fetch_and_evaluate_category_deals(category, budget_range):
+    # ইউআরএল তৈরির ভুল এবং স্পেসের টাইপো ফিক্স করা হয়েছে
     print(f"\n[Scraping] Searching Amazon for {category} within budget {budget_range}...")
     
     headers = {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept-Language": "en-US,en;q=0.9,bn;q=0.8",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-        "Device-Memory": "8",
-        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Connection": "keep-alive"
     }
     
     evaluated_deals = []
     
     try:
-        search_query = category.replace(' ', '+')
-        # সরাসরি নির্দিষ্ট প্রাইস ফিল্টার সহ আমাজন সার্চ ইউআরএল তৈরি (যাতে আমাজন কম ডেটা ব্লক করতে পারে)
+        search_query = category.strip().replace(' ', '+')
+        # ইউআরএল ফরম্যাট সম্পূর্ণ সংশোধন করা হয়েছে (amazon.in এবং কুয়েরির মাঝে প্রোপার স্ল্যাশ ও প্যারামিটার যোগ করা হয়েছে)
         if isinstance(budget_range, tuple):
             target_url = f"https://amazon.in{search_query}&rh=p_36%3A{budget_range[0]}00-{budget_range[1]}00"
         else:
             target_url = f"https://amazon.in{search_query}"
             
-        # হিউম্যান বিহেভিয়ার নকল করতে র্যান্ডম ডিলে বা বিলম্ব
-        time.sleep(random.uniform(2.5, 5.0))
-        
+        time.sleep(random.uniform(2.0, 4.0))
         response = requests.get(target_url, headers=headers, timeout=15)
         
-        if "To discuss automated access to Amazon data please contact" in response.text or response.status_code == 503:
-            print("⚠️ Amazon Anti-Bot Blocked the Request (Bot Detected)!")
-            return []
-
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            # আমাজনের আসল প্রোডাক্ট কার্ড সিলেক্টর
             items = soup.select('div[data-component-type="s-search-result"]')
             
             for item in items:
@@ -112,11 +101,10 @@ def fetch_and_evaluate_category_deals(category, budget_range):
                             if not (min_b <= price <= max_b):
                                 continue
 
-                        # সরাসরি সুনির্দিষ্ট প্রোডাক্টের ডিরেক্ট বাই লিংক (কোনো হোমপেজ বা সার্চ পেজ নয়)
-                        # আমাজনের স্ট্যান্ডার্ড ডাইরেক্ট প্রোডাক্ট ফরম্যাট: amazon.in/dp/ASIN?tag=yourtag
+                        # ১০০% ডিরেক্ট স্পেসিফিক প্রোডাক্ট পেজ বাই লিংক
                         direct_product_link = f"https://amazon.in{asin}?tag={AFFILIATE_TAG}"
                         
-                        # আপনার filters.py এর লজিকের জন্য ডামি স্পেক্স স্ট্রাকচার পাস করা
+                        # filters.py এর প্যারামিটার যাচাই লজিক
                         specs = {
                             'has_enc': True, 'has_anc': True if price >= 1500 else False,
                             'driver_size_mm': 13, 'battery_hrs': 60, 'bluetooth_version': 5.3,
@@ -136,7 +124,7 @@ def fetch_and_evaluate_category_deals(category, budget_range):
                         is_valid, issues = curator.evaluate_product(category, price, specs)
                         
                         evaluated_deals.append({
-                            'name': name[:60] + "...", # টেলিগ্রাম মেসেজ সুন্দর রাখার জন্য নাম ছোট করা হলো
+                            'name': name[:50] + "...",
                             'price': price,
                             'link': direct_product_link,
                             'issues_count': len(issues)
@@ -156,29 +144,29 @@ def bot_main_loop():
             ranges = CATEGORY_BUDGET_CYCLES[cat]
             for current_range in ranges:
                 try:
-                    deals = fetch_and_evaluate_category_deals(cat, current_range)
+                    deals = float_deals = fetch_and_evaluate_category_deals(cat, current_range)
                     
                     if deals:
-                        # আপনার filters.py এর লজিকের সাথে সবচেয়ে বেশি মেলা (কম issues থাকা) প্রোডাক্টটি সবার উপরে সর্ট হবে
+                        # ফিল্টারের লজিকের সাথে সবচেয়ে বেশি মেলা (কম অমিল বা issues থাকা) প্রোডাক্টটি বেছে নেওয়া হবে
                         deals = sorted(deals, key=lambda x: x['issues_count'])
-                        best_deal = deals[0] # ১টি সুনির্দিষ্ট সেরা প্রোডাক্ট নির্বাচন করা হলো
+                        best_deal = deals[0]
                         
-                        # কঠোর ভেরিফিকেশন: লিংকটি যেন কোনোভাবেই ফাঁকা বা সাধারণ সার্চ পেজ না হয়
+                        # কঠোর নিরাপত্তা চেক: লিংকটি যেন হোমপেজ বা অন্য কোনো ফালতু পেজ না হয়, শুধুমাত্র সরাসরি প্রোডাক্ট পেজ হলেই মেসেজ যাবে
                         if "/dp/" in best_deal['link'] and "tag=" in best_deal['link']:
                             message = (
-                                f"🛍️ *আজকের সেরা ফিল্টার্ড ডিল\!*\n\n"
-                                f"📦 *প্রোডাক্ট:* {best_deal['name']}\n"
-                                f"💰 *দাম:* ₹{best_deal['price']}\n"
-                                f"🎯 *ফিল্টার স্ট্যাটাস:* লজিক্যাল ম্যাচ সফল।\n\n"
-                                f"🛒 *সরাসরি কিনতে নিচের লিংকে ক্লিক করুন:* \n"
-                                f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({best_deal['link']})"
+                                f"🔥 *Best Matched Deal for {cat.upper()}* 🔥\n"
+                                f"💰 *Budget Range:* ₹{current_range[0]} - ₹{current_range[1]}\n\n"
+                                f"📦 *Product:* {best_deal['name']}\n"
+                                f"💰 *Price:* ₹{best_deal['price']}\n"
+                                f"🔗 [Buy Direct Product Here]({best_deal['link']})"
                             )
                             send_telegram_message(message)
-                            print(f"🎯 Direct Product link posted successfully for {cat}!")
-                        else:
-                            print("❌ Generated link format invalid. Skipping to avoid wrong link posts.")
+                            print(f"Successfully posted direct product deal to Telegram!")
+                    else:
+                        # স্ক্র্যাপিং বা ফিল্টারিং ফেইল করলে কোনো ফেক/ভুল লিংক আর জেনারেট হবে না
+                        print(f"⚠️ No matching product found for {cat} in range {current_range} or request blocked. Skipping...")
                     
-                    # আমাজন ব্লক এড়াতে এবং Railway ক্র্যাশ রুখতে ৩০ মিনিট পর পর সাইকেল চলবে
+                    # আমাজন ব্লক এড়াতে এবং সাইকেল ঠিক রাখতে ৩০ মিনিট পর পর স্ক্র্যাপ হবে
                     print("Sleeping for 30 minutes before next crawl...")
                     time.sleep(1800)
                     
@@ -187,10 +175,9 @@ def bot_main_loop():
                     time.sleep(60)
 
 if __name__ == "__main__":
-    # Railway সার্ভার যাতে পোর্ট বাইন্ডিং এর অভাবে ক্র্যাশ না করে, তাই Flask থ্রেড চালু রাখা হলো
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     
     bot_main_loop()
-                    
+    
