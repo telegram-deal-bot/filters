@@ -92,7 +92,8 @@ def deep_visit_product(asin, category, price, headers):
 def fetch_and_select_ultimate_deal(category, budget_range):
     # ইউআরএল ফিক্সিং: সম্পূর্ণ আলাদা প্যারামিটার স্ট্রাকচার তৈরি করা হলো যাতে .intws টাইপো হওয়ার কোনো সুযোগ না থাকে
     clean_category = str(category).strip().replace(' ', '+')
-    target_search_url = f"https://amazon.in"
+    target_search_url = "https://www.amazon.in/s"
+
     
     # ডোমেন এবং কুয়েরিকে আলাদা প্যারামিটার (params) হিসেবে পাঠানো হচ্ছে যাতে ব্যাকএন্ডে ইউআরএল সঠিকভাবে তৈরি হয়
     search_params = {
