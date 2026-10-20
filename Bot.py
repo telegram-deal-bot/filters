@@ -35,6 +35,7 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
+# সঠিক বানান সহ ক্যাটাগরি ও বাজেট সাইকেল ডিফাইন করা হলো
 CATEGORY_BUDGET_CYCLES = {
     'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500)],
     'speaker': [(0, 500), (500, 700), (700, 1000), (1000, 1500)],
@@ -174,7 +175,7 @@ def bot_main_loop():
     # বট সফলভাবে ডিপ্লয় ও রান হওয়ার সাথে সাথেই টেলিগ্রামে প্রথম মেসেজ পাঠিয়ে দেবে
     send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nEasyparser API secured mode is active. Now scanning for best deals...")
     
-    categories = list(CATEGORY_BUBGET_CYCLES.keys())
+    categories = list(CATEGORY_BUDGET_CYCLES.keys())
     while True:
         for cat in categories:
             ranges = CATEGORY_BUDGET_CYCLES[cat]
@@ -196,7 +197,6 @@ def bot_main_loop():
                     else:
                         print(f"[Skip] No optimal verified product found for {cat} in range {current_range}.")
                         
-                    # আপনার নির্দেশমতো টাইম ১ ঘণ্টা (3600 সেকেন্ড) রাখা হয়েছে যাতে ক্রেডিট বাঁচে
                     print("Sleeping for 60 minutes before next category crawl...")
                     time.sleep(3600)
                 except Exception as e:
@@ -208,4 +208,4 @@ if __name__ == "__main__":
     flask_thread.daemon = True
     flask_thread.start()
     bot_main_loop()
-    
+            
