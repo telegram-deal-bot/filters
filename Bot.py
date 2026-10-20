@@ -130,7 +130,6 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             name = item.get('title', '')
             price_val = item.get('price', 0)
             
-            # সেফটি চেক: প্রাইস যদি ডিকশনারি হয় তবে সেখান থেকে সঠিক ভ্যালু বের করে নেওয়া
             if isinstance(price_val, dict):
                 price_val = price_val.get('value', 0) or price_val.get('raw', 0)
 
@@ -179,7 +178,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nEasyparser API secured mode is active. Now scanning for best deals...")
+    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nEasyparser API secured mode is active (6-hour interval mode). Now scanning for best deals...")
     
     categories = list(CATEGORY_BUDGET_CYCLES.keys())
     while True:
@@ -203,8 +202,9 @@ def bot_main_loop():
                     else:
                         print(f"[Skip] No optimal verified product found for {cat} in range {current_range}.")
                         
-                    print("Sleeping for 60 minutes before next category crawl...")
-                    time.sleep(3600)
+                    # আপনার হিসাব অনুযায়ী ফ্রি ক্রেডিট বাঁচাতে টাইম ৬ ঘণ্টা (21600 সেকেন্ড) করা হলো
+                    print("Sleeping for 6 hours before next category crawl to save API credits...")
+                    time.sleep(21600)
                 except Exception as e:
                     print(f"Loop runtime error: {e}")
                     time.sleep(60)
@@ -214,4 +214,4 @@ if __name__ == "__main__":
     flask_thread.daemon = True
     flask_thread.start()
     bot_main_loop()
-                                  
+    
