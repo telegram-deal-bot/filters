@@ -35,7 +35,6 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# সঠিক বানান সহ ক্যাটাগরি ও বাজেট সাইকেল ডিফাইন করা হলো
 CATEGORY_BUDGET_CYCLES = {
     'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500)],
     'speaker': [(0, 500), (500, 700), (700, 1000), (1000, 1500)],
@@ -131,12 +130,19 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             name = item.get('title', '')
             price_val = item.get('price', 0)
             
+            # সেফটি চেক: প্রাইস যদি ডিকশনারি হয় তবে সেখান থেকে সঠিক ভ্যালু বের করে নেওয়া
+            if isinstance(price_val, dict):
+                price_val = price_val.get('value', 0) or price_val.get('raw', 0)
+
             if isinstance(price_val, str):
                 price_text = price_val.replace(',', '').replace('₹', '')
                 digits = ''.join(filter(str.isdigit, price_text))
                 price = int(digits) if digits else 0
             else:
-                price = int(price_val) if price_val else 0
+                try:
+                    price = int(price_val) if price_val else 0
+                except:
+                    price = 0
                 
             if price > 0:
                 if isinstance(budget_range, tuple):
@@ -146,6 +152,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 valid_items_pool.append({'asin': asin, 'name': name, 'price': price})
                 
         if not valid_items_pool:
+            print(f"[Info] No valid price items found for {category} in range {budget_range}.")
             return None
             
         ultimate_round_contenders = []
@@ -172,7 +179,6 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     return None
 
 def bot_main_loop():
-    # বট সফলভাবে ডিপ্লয় ও রান হওয়ার সাথে সাথেই টেলিগ্রামে প্রথম মেসেজ পাঠিয়ে দেবে
     send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nEasyparser API secured mode is active. Now scanning for best deals...")
     
     categories = list(CATEGORY_BUDGET_CYCLES.keys())
@@ -208,4 +214,4 @@ if __name__ == "__main__":
     flask_thread.daemon = True
     flask_thread.start()
     bot_main_loop()
-            
+                                  
