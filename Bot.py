@@ -35,10 +35,12 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-CATEGORY_BUDGET_CYCLES = {
-    'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500)],
-    'speaker': [(0, 500), (500, 700), (700, 1000), (1000, 1500)],
-    'smartwatch': [(1000, 2000), (2000, 3000), (3000, 4000)]
+# ক্যাটাগরি এবং সেগুলোর বাজেট স্লটগুলো সাজানো (রাউন্ড-রবিন লজিকের জন্য)
+CATEGORY_BUDGET_SLOTS = {
+    'speaker': [(0, 500), (500, 700), (700, 1000), (1000, 1500), (1500, 2500), (2500, 5000)],
+    'headphone': [(500, 1000), (1000, 1500), (1500, 2000), (2000, 3000), (3000, 4000), (4000, 5000)],
+    'smartwatch': [(1000, 2000), (2000, 3000), (3000, 4000), (4000, 5000)],
+    'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500), (1500, 2000), (2000, 3000), (3000, 4000), (4000, 5000)]
 }
 
 curator = DealCuratorMaster()
@@ -98,7 +100,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         min_p, max_p = budget_range
         target_search_url += f"&rh=p_36%3A{min_p}00-{max_p}00"
 
-    print(f"\n[Crawl Start] Requesting via Easyparser API for: {clean_category}")
+    print(f"\n[Crawl Start] Requesting via Easyparser API for: {clean_category} in range {budget_range}")
     
     api_endpoint = "https://realtime.easyparser.com/v1/request"
     params = {
@@ -178,14 +180,23 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nEasyparser API secured mode is active (6-hour interval mode). Now scanning for best deals...")
+    # শুরুতে কোনো এপিআই কল না করে শুধুমাত্র পপ-আপ স্টার্টআপ মেসেজ পাঠানো হবে
+    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nBot is online. Scanning will begin in 6 hours to save API credits...")
     
-    categories = list(CATEGORY_BUDGET_CYCLES.keys())
+    categories = list(CATEGORY_BUDGET_SLOTS.keys())
+    max_slots = max(len(slots) for slots in CATEGORY_BUDGET_SLOTS.values())
+    
+    slot_index = 0
     while True:
         for cat in categories:
-            ranges = CATEGORY_BUDGET_CYCLES[cat]
-            for current_range in ranges:
+            slots = CATEGORY_BUDGET_SLOTS[cat]
+            if slot_index < len(slots):
+                current_range = slots[slot_index]
                 try:
+                    # প্রথম স্টার্টআপ মেসেজের পর থেকে ঠিক ৬ ঘণ্টা পর পর এপিআই কল শুরু হবে
+                    print(f"Sleeping for 6 hours before scanning {cat} in range {current_range}...")
+                    time.sleep(21600)
+                    
                     winner_deal = fetch_and_select_ultimate_deal(cat, current_range)
                     
                     if winner_deal and winner_deal['issues_count'] < 99:
@@ -202,16 +213,17 @@ def bot_main_loop():
                     else:
                         print(f"[Skip] No optimal verified product found for {cat} in range {current_range}.")
                         
-                    # আপনার হিসাব অনুযায়ী ফ্রি ক্রেডিট বাঁচাতে টাইম ৬ ঘণ্টা (21600 সেকেন্ড) করা হলো
-                    print("Sleeping for 6 hours before next category crawl to save API credits...")
-                    time.sleep(21600)
                 except Exception as e:
                     print(f"Loop runtime error: {e}")
                     time.sleep(60)
+        
+        slot_index += 1
+        if slot_index >= max_slots:
+            slot_index = 0  # সব স্লট শেষ হলে আবার প্রথম থেকে রাউন্ড শুরু হবে
 
 if __name__ == "__main__":
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     bot_main_loop()
-    
+            
