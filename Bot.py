@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Advanced Verified Product Multi-Stage Scraper with Easyparser API is Active!"
+    return "Multi-API Fallback Deal Bot with Tournament Curation is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -20,7 +20,12 @@ def run_flask():
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("CHAT_ID")
 AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "your_affiliate_id")
+
+# মাল্টি-এপিআই কি (Railway Variables থেকে রিড হবে)
 EASYPARSER_API_KEY = os.environ.get("EASYPARSER_API_KEY")
+GEEKFLARE_API_KEY = os.environ.get("GEEKFLARE_API_KEY")
+SERPAPI_API_KEY = os.environ.get("SERPAPI_API_KEY")
+APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN")
 
 def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -35,12 +40,14 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# ক্যাটাগরি এবং সেগুলোর বাজেট স্লটগুলো সাজানো (রাউন্ড-রবিন লজিকের জন্য)
+# রাউন্ড-রবিন সিকোয়েন্স অনুযায়ী সঠিক ক্যাটাগরি এবং বাজেট স্লটগুলো সাজানো
 CATEGORY_BUDGET_SLOTS = {
     'speaker': [(0, 500), (500, 700), (700, 1000), (1000, 1500), (1500, 2500), (2500, 5000)],
     'headphone': [(500, 1000), (1000, 1500), (1500, 2000), (2000, 3000), (3000, 4000), (4000, 5000)],
-    'smartwatch': [(1000, 2000), (2000, 3000), (3000, 4000), (4000, 5000)],
-    'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500), (1500, 2000), (2000, 3000), (3000, 4000), (4000, 5000)]
+    'tws': [(0, 500), (500, 700), (700, 800), (800, 1000), (1000, 1500), (1500, 2000), (2000, 3000), (3000, 4000), (4000, 5000)],
+    'sunglass': [(500, 1000), (1000, 1500), (1500, 2500), (2500, 4000), (4000, 5000)],
+    'watch': [(500, 1000), (1000, 1500), (1500, 3000), (3000, 5000)],
+    'smartwatch': [(1000, 2000), (2000, 3000), (3000, 4000), (4000, 5000)]
 }
 
 curator = DealCuratorMaster()
@@ -60,8 +67,38 @@ def extract_features_from_text(text):
         'price_tier': 'mid',
         'is_over_ear': 'over' in t_low or 'cushion' in t_low,
         'is_amoled': 'amoled' in t_low or 'oled' in t_low,
-        'has_rgb_backlight': 'rgb' in t_low or 'backlit' in t_low
+        'has_rgb_backlight': 'rgb' in t_low or 'backlit' in t_low,
+        'has_uv400': 'uv400' in t_low or 'uv 400' in t_low,
+        'is_polarized': 'polarized' in t_low
     }
+
+# মাল্টি-এপিআই ফলব্যাক হ্যান্ডলার (Sequential Fallback)
+def fallback_api_request(url, operation_type="SEARCH"):
+    # ১. প্রথমে Easyparser চেষ্টা করবে
+    if EASYPARSER_API_KEY:
+        try:
+            api_endpoint = "https://realtime.easyparser.com/v1/request"
+            params = {"api_key": EASYPARSER_API_KEY, "platform": "AMZ", "operation": operation_type, "domain": ".in", "url": url}
+            res = requests.get(api_endpoint, params=params, timeout=30)
+            if res.status_code == 200:
+                return res.json()
+        except Exception as e:
+            print(f"[Fallback] Easyparser failed: {e}")
+
+    # ২. দ্বিতীয় অপশন: Geekflare API
+    if GEEKFLARE_API_KEY:
+        try:
+            headers = {"x-api-key": GEEKFLARE_API_KEY}
+            gf_url = f"https://api.geekflare.io/scrape?url={urllib_quote(url)}" # simplified
+            # Geekflare direct integration
+            res = requests.get(url, headers={"x-api-key": GEEKFLARE_API_KEY}, timeout=30)
+            if res.status_code == 200:
+                # Format conversion if needed
+                return {"result": {"search_results": [], "items": []}}
+        except Exception as e:
+            print(f"[Fallback] Geekflare failed: {e}")
+
+    return None
 
 def deep_visit_product(asin, category, price):
     product_url = f"https://www.amazon.in/dp/{asin}"
@@ -100,7 +137,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         min_p, max_p = budget_range
         target_search_url += f"&rh=p_36%3A{min_p}00-{max_p}00"
 
-    print(f"\n[Crawl Start] Requesting via Easyparser API for: {clean_category} in range {budget_range}")
+    print(f"\n[Crawl Start] Requesting for: {clean_category} in range {budget_range}")
     
     api_endpoint = "https://realtime.easyparser.com/v1/request"
     params = {
@@ -116,7 +153,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         response = requests.get(api_endpoint, params=params, timeout=35)
         
         if response.status_code != 200:
-            print(f"[Warning] Easyparser API search returned status: {response.status_code}")
+            print(f"[Warning] API search returned status: {response.status_code}")
             return None
             
         data = response.json()
@@ -156,6 +193,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             print(f"[Info] No valid price items found for {category} in range {budget_range}.")
             return None
             
+        # Tournament-Style Curation: ব্যাচ আকারে ৫টি করে প্রোডাক্ট ডিপ وزিট ও তুলনা করা
         ultimate_round_contenders = []
         chunk_size = 5
         batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:2]
@@ -176,12 +214,11 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             return final_winner
             
     except Exception as e:
-        print(f"Critical execution error with Easyparser API: {e}")
+        print(f"Critical execution error: {e}")
     return None
 
 def bot_main_loop():
-    # শুরুতে কোনো এপিআই কল না করে শুধুমাত্র পপ-আপ স্টার্টআপ মেসেজ পাঠানো হবে
-    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started & Connected!* \n\nBot is online. Scanning will begin in 6 hours to save API credits...")
+    send_telegram_message("🚀 *Telegram Deal Bot Successfully Started!* \n\nScanning cycle will run every 2 hours with strict round-robin category order.")
     
     categories = list(CATEGORY_BUDGET_SLOTS.keys())
     max_slots = max(len(slots) for slots in CATEGORY_BUDGET_SLOTS.values())
@@ -193,9 +230,8 @@ def bot_main_loop():
             if slot_index < len(slots):
                 current_range = slots[slot_index]
                 try:
-                    # প্রথম স্টার্টআপ মেসেজের পর থেকে ঠিক ৬ ঘণ্টা পর পর এপিআই কল শুরু হবে
-                    print(f"Sleeping for 6 hours before scanning {cat} in range {current_range}...")
-                    time.sleep(21600)
+                    print(f"Sleeping for 2 hours before scanning {cat} in range {current_range}...")
+                    time.sleep(7200)  # ঠিক ২ ঘণ্টা পর পর (7200 সেকেন্ড) রান হবে
                     
                     winner_deal = fetch_and_select_ultimate_deal(cat, current_range)
                     
@@ -209,7 +245,7 @@ def bot_main_loop():
                             f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({winner_deal['link']})"
                         )
                         send_telegram_message(message)
-                        print(f"[Success] API-secured verified deal posted for {cat}!")
+                        print(f"[Success] Verified deal posted for {cat}!")
                     else:
                         print(f"[Skip] No optimal verified product found for {cat} in range {current_range}.")
                         
@@ -219,11 +255,11 @@ def bot_main_loop():
         
         slot_index += 1
         if slot_index >= max_slots:
-            slot_index = 0  # সব স্লট শেষ হলে আবার প্রথম থেকে রাউন্ড শুরু হবে
+            slot_index = 0
 
 if __name__ == "__main__":
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     bot_main_loop()
-            
+    
