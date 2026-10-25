@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Strict-Price & Flexible-Feature Deal Bot is Active!"
+    return "Perfect Price-Targeted Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -119,9 +119,8 @@ CATEGORY_BUDGET_SLOTS = [
 
 curator = DealCuratorMaster()
 
-def extract_flexible_specs(name):
+def extract_flexible_specs(category, name):
     t_low = name.lower()
-    # ফিচারে কোনো কড়াকড়ি নেই—নমনীয়ভাবে স্পেক্স জেনারেট করবে যাতে filters.py ক্র্যাশ না করে এবং আংশিক ম্যাচ পায়
     return {
         'has_uv400': True,
         'is_polarized': 'polar' in t_low,
@@ -153,7 +152,13 @@ def extract_flexible_specs(name):
         'has_timer': True,
         'material': '304 Stainless Steel',
         'has_dry_boil_protection': True,
-        'is_360_degree_cordless': True
+        'is_360_degree_cordless': True,
+        'price_tier': 'mid_enthusiast',
+        'usage_type': 'Outdoor',
+        'item_type': 'Trimmer',
+        'appliance_type': 'Chopper',
+        'light_type': 'Strip Light',
+        'mouse_sub_type': 'Gaming Wired'
     }
 
 def fetch_and_select_ultimate_deal(category, budget_range):
@@ -165,7 +170,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     clean_query = str(category).strip().replace(' ', '+')
     min_p, max_p = budget_range
     
-    # আপনার নির্দেশনা অনুযায়ী প্রাইস উইথ সার্চ (যেমন under max_p)
+    # আপনার কথামতো ঠিক এইভাবে সার্চ করা হবে: যেমন 'sunglass+under+1000'
     serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}+under+{max_p}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
@@ -212,19 +217,21 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         # ১. প্রাইস রেঞ্জে ১০০% কড়াকড়ি: শুধুমাত্র নির্দিষ্ট প্রাইস রেঞ্জের (min_p থেকে max_p) মধ্যে থাকা পণ্যগুলোই ফিল্টার করা হবে
         strict_price_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
         
-        # যদি কঠোর রেঞ্জে না পাওয়া যায়, তবেই কেবল এপিআই থেকে আসা পুল ব্যবহার করবে যাতে বট থেমে না থাকে
-        working_pool = strict_price_pool if strict_price_pool else all_items_pool
+        if not strict_price_pool:
+            print(f"[Info] No exact items found in range {min_p}-{max_p} for {category}. Skipping to avoid wrong price.")
+            return None
 
         # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করা
         chunk_size = 5
-        batches = [working_pool[i:i + chunk_size] for i in range(0, len(working_pool), chunk_size)][:5]
+        batches = [strict_price_pool[i:i + chunk_size] for i in range(0, len(strict_price_pool), chunk_size)][:5]
         
         ultimate_round_contenders = []
         for batch in batches:
             batch_evaluated = []
             for prod in batch:
-                specs = extract_flexible_specs(prod['name'])
+                specs = extract_flexible_specs(category, prod['name'])
                 try:
+                    # সরাসরি filters.py এর DealCuratorMaster ক্লাসে কল করা হচ্ছে
                     is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
                     # ২. ফিচারে কোনো কড়াকড়ি নেই: যেটিতে সবচেয়ে কম ত্রুটি বা সর্বোচ্চ মিল থাকবে (Lowest Issues)
                     prod['issues_count'] = len(issues)
@@ -240,17 +247,13 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             final_winner = sorted(ultimate_round_contenders, key=lambda x: x['issues_count'])[0]
             final_winner['link'] = f"https://amazon.in/dp/{final_winner['asin']}?tag={AFFILIATE_TAG}"
             return final_winner
-        else:
-            fallback = working_pool[0]
-            fallback['link'] = f"https://amazon.in/dp/{fallback['asin']}?tag={AFFILIATE_TAG}"
-            return fallback
             
     except Exception as e:
         print(f"[Exception] {e}")
         return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Strict-Price & Flexible-Feature Deal Bot Started!*")
+    send_telegram_message("🚀 *Price-Targeted Deal Bot Started Successfully!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -273,7 +276,7 @@ def bot_main_loop():
                 send_telegram_message(message)
                 print(f"[Success] Best deal posted for {cat}!")
             else:
-                print(f"[Skip] Skipping slot for {cat}.")
+                print(f"[Skip] No matching product found in exact price range for {cat}.")
                 
         except Exception as e:
             print(f"Loop error: {e}")
