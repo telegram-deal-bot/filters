@@ -36,7 +36,7 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট
+# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট (সঠিক ব্র্যাকেট ও সিনট্যাক্স সহ)
 CATEGORY_BUDGET_SLOTS = [
     ('sunglass', (500, 1000)),
     ('watch', (500, 1000)),
@@ -118,6 +118,7 @@ CATEGORY_BUDGET_SLOTS = [
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
     ('tws', (4000, 5000)]
+]
 
 curator = DealCuratorMaster()
 
@@ -125,7 +126,6 @@ def human_delay(min_sec=1.5, max_sec=3.0):
     time.sleep(random.uniform(min_sec, max_sec))
 
 def make_api_request(url, operation_type="SEARCH"):
-    # ১. প্রথমে SerpApi দিয়ে চেষ্টা করবে
     if SERPAPI_API_KEY:
         try:
             serp_url = f"https://serpapi.com/search.json?engine=amazon&q={url}&api_key={SERPAPI_API_KEY}"
@@ -137,7 +137,6 @@ def make_api_request(url, operation_type="SEARCH"):
         except Exception as e:
             print(f"[Fallback] SerpApi failed: {e}")
 
-    # ২. SerpApi ফেইল করলে Geekflare-এ অটো শিফট হবে
     if GEEKFLARE_API_KEY:
         try:
             headers = {'x-api-key': GEEKFLARE_API_KEY}
@@ -148,7 +147,6 @@ def make_api_request(url, operation_type="SEARCH"):
         except Exception as e:
             print(f"[Fallback] Geekflare failed: {e}")
 
-    # ৩. সবশেষে Easyparser ব্যাকআপ হিসেবে কাজ করবে
     if EASYPARSER_API_KEY:
         try:
             api_endpoint = "https://realtime.easyparser.com/v1/request"
@@ -232,7 +230,6 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         print(f"[Info] No valid items found for {category} in range {budget_range}.")
         return None
         
-    # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করে সেরাটি বেছে নেওয়া (Tournament-Style Curation)
     ultimate_round_contenders = []
     chunk_size = 5
     batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:2]
