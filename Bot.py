@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Perfect Price-Targeted Deal Bot is Active!"
+    return "Robust Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -33,7 +33,6 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট
 CATEGORY_BUDGET_SLOTS = [
     ('sunglass', (500, 1000)),
     ('watch', (500, 1000)),
@@ -170,21 +169,24 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     clean_query = str(category).strip().replace(' ', '+')
     min_p, max_p = budget_range
     
-    # আপনার কথামতো ঠিক এইভাবে সার্চ করা হবে: যেমন 'sunglass+under+1000'
-    serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}+under+{max_p}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
+    # সরাসরি সঠিক কুয়েরি পাঠানো হচ্ছে যাতে এপিআই রেসপন্স দেয়
+    serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
         res = requests.get(serp_url, timeout=30)
         if res.status_code != 200:
+            print(f"[API Error] Status code: {res.status_code}")
             return None
             
         data = res.json()
         if "error" in data:
+            print(f"[API Error Message] {data['error']}")
             send_telegram_message(f"⚠️ *API Error:* {data['error']}\nPlease update key in Railway.")
             return None
             
         items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
         if not items:
+            print(f"[API Warning] No items returned from SerpApi for query: {clean_query}")
             return None
             
         all_items_pool = []
@@ -212,16 +214,17 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 all_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
                 
         if not all_items_pool:
+            print(f"[Info] No priced items parsed for {category}.")
             return None
 
-        # ১. প্রাইস রেঞ্জে ১০০% কড়াকড়ি: শুধুমাত্র নির্দিষ্ট প্রাইস রেঞ্জের (min_p থেকে max_p) মধ্যে থাকা পণ্যগুলোই ফিল্টার করা হবে
+        # নির্দিষ্ট প্রাইস রেঞ্জে কড়াকড়ি ফিল্টারিং
         strict_price_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
         
         if not strict_price_pool:
-            print(f"[Info] No exact items found in range {min_p}-{max_p} for {category}. Skipping to avoid wrong price.")
+            print(f"[Info] No items found in exact range {min_p}-{max_p} for {category}. (Available pool prices: {[p['price'] for p in all_items_pool]})")
             return None
 
-        # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করা
+        # ৫টি প্রোডাক্টের ব্যাচ তৈরি করা
         chunk_size = 5
         batches = [strict_price_pool[i:i + chunk_size] for i in range(0, len(strict_price_pool), chunk_size)][:5]
         
@@ -231,9 +234,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             for prod in batch:
                 specs = extract_flexible_specs(category, prod['name'])
                 try:
-                    # সরাসরি filters.py এর DealCuratorMaster ক্লাসে কল করা হচ্ছে
                     is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
-                    # ২. ফিচারে কোনো কড়াকড়ি নেই: যেটিতে সবচেয়ে কম ত্রুটি বা সর্বোচ্চ মিল থাকবে (Lowest Issues)
                     prod['issues_count'] = len(issues)
                 except Exception as e:
                     prod['issues_count'] = 99
@@ -253,7 +254,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Price-Targeted Deal Bot Started Successfully!*")
+    send_telegram_message("🚀 *Deal Bot Started & Ready!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -279,7 +280,7 @@ def bot_main_loop():
                 print(f"[Skip] No matching product found in exact price range for {cat}.")
                 
         except Exception as e:
-            print(f"Loop error: {e}")
+            print(f"Loop error: {e})")
             
         slot_index = (slot_index + 1) % total_slots
         time.sleep(7200)
