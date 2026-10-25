@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Stable Deal Bot is Active!"
+    return "Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -19,7 +19,6 @@ def run_flask():
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("CHAT_ID")
 AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "technicalbot2-21")
-
 SERPAPI_API_KEY = os.environ.get("SERPAPI_API_KEY")
 
 def send_telegram_message(text):
@@ -163,30 +162,33 @@ def extract_flexible_specs(category, name):
 def fetch_and_select_ultimate_deal(category, budget_range):
     if not SERPAPI_API_KEY:
         print("[Error] SERPAPI_API_KEY missing!")
-        send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway!")
         return None
 
-    clean_query = str(category).strip()
     min_p, max_p = budget_range
+    query_str = f"{category} under {max_p}"
     
-    # একদম সহজ এবং স্ট্যান্ডার্ড SerpApi রিকোয়েস্ট ইউআরএল (কোনো 400 এরর হবে না)
-    serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
+    # সঠিক প্যারামিটারসহ requests.get ব্যবহার করা হচ্ছে যাতে কোনো 400 Bad Request না আসে
+    params = {
+        "engine": "amazon",
+        "q": query_str,
+        "amazon_domain": "amazon.in",
+        "api_key": SERPAPI_API_KEY
+    }
     
     try:
-        res = requests.get(serp_url, timeout=30)
+        res = requests.get("https://serpapi.com/search.json", params=params, timeout=30)
         if res.status_code != 200:
-            print(f"[API Error] Status code: {res.status_code}")
+            print(f"[API Error] Status code: {res.status_code}, Response: {res.text}")
             return None
             
         data = res.json()
         if "error" in data:
             print(f"[API Error Message] {data['error']}")
-            send_telegram_message(f"⚠️ *API Error:* {data['error']}\nPlease update key in Railway.")
             return None
             
         items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
         if not items:
-            print(f"[API Warning] No items returned from SerpApi for query: {clean_query}")
+            print(f"[API Warning] No items returned for query: {query_str}")
             return None
             
         all_items_pool = []
@@ -216,14 +218,14 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         if not all_items_pool:
             return None
 
-        # ১. প্রাইস রেঞ্জে ১০০% কড়াকড়ি: শুধুমাত্র নির্দিষ্ট প্রাইস রেঞ্জের (min_p থেকে max_p) মধ্যে থাকা পণ্যগুলোই ফিল্টার করা হবে
+        # প্রাইস রেঞ্জে ১০০% কড়াকড়ি (শুধু নির্দিষ্ট রেঞ্জের পণ্য ফিল্টার করা)
         strict_price_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
         
         if not strict_price_pool:
             print(f"[Info] No items found in exact range {min_p}-{max_p} for {category}.")
             return None
 
-        # ৫টি প্রোডাক্টের ব্যাচ তৈরি করা
+        # ৫টি প্রোডাক্টের ব্যাচ তৈরি করা এবং filters.py এর মাধ্যমে মূল্যায়ন করা
         chunk_size = 5
         batches = [strict_price_pool[i:i + chunk_size] for i in range(0, len(strict_price_pool), chunk_size)][:5]
         
@@ -234,7 +236,6 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 specs = extract_flexible_specs(category, prod['name'])
                 try:
                     is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
-                    # ২. ফিচারে কোনো কড়াকড়ি নেই: সর্বনিম্ন ত্রুটি বা সর্বোচ্চ মিল ওয়ালা প্রোডাক্ট নির্বাচন
                     prod['issues_count'] = len(issues)
                 except Exception as e:
                     prod['issues_count'] = 99
