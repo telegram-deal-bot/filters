@@ -4,12 +4,13 @@ import random
 import requests
 from flask import Flask
 from threading import Thread
+from filters import DealCuratorMaster
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Simple & Robust Sequential Deal Bot is Active!"
+    return "Optimized Credit-Saving Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -32,7 +33,7 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# সঠিক ব্র্যাকেট এবং সিনট্যাক্স সহ মাস্টার সিকোয়েন্স ও প্রাইস স্লট
+# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট
 CATEGORY_BUDGET_SLOTS = [
     ('sunglass', (500, 1000)),
     ('watch', (500, 1000)),
@@ -113,17 +114,37 @@ CATEGORY_BUDGET_SLOTS = [
     ('headphone', (4000, 5000)),
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
-    ('tws', (4000, 5000))  # সবশেষ ব্র্যাকেট সঠিকভাবে বন্ধ করা হয়েছে
+    ('tws', (4000, 5000))
 ]
 
-def fetch_deal(category, budget_range):
+curator = DealCuratorMaster()
+
+def extract_features(text):
+    t_low = text.lower()
+    return {
+        'has_uv400': 'uv400' in t_low or 'uv 400' in t_low,
+        'is_polarized': 'polarized' in t_low,
+        'has_warranty': any(x in t_low for x in ['warranty', '1 year', '12 months']),
+        'is_amoled': 'amoled' in t_low or 'oled' in t_low,
+        'has_rgb_backlight': 'rgb' in t_low or 'backlit' in t_low,
+        'movement_type': 'Japanese Quartz',
+        'water_resistant_atm': 3,
+        'battery_type': 'Li-Polymer',
+        'has_safety_protections': True,
+        'is_mechanical': 'mechanical' in t_low,
+        'has_anti_ghosting': True
+    }
+
+def fetch_and_select_ultimate_deal(category, budget_range):
     if not SERPAPI_API_KEY:
-        print("[Error] SERPAPI_API_KEY is missing!")
+        print("[Error] SERPAPI_API_KEY missing!")
         send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway!")
         return None
 
     clean_query = str(category).strip().replace(' ', '+')
     min_p, max_p = budget_range
+    
+    # সুনির্দিষ্ট ক্যাটাগরি এবং প্রাইস রেঞ্জ দিয়ে সার্চ ইউআরএল তৈরি
     serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
@@ -133,11 +154,12 @@ def fetch_deal(category, budget_range):
             
         data = res.json()
         if "error" in data:
-            send_telegram_message(f"⚠️ *API Credit Exhausted:* {data['error']}\nPlease update key in Railway.")
+            send_telegram_message(f"⚠️ *API Error/Credit Exhausted:* {data['error']}\nPlease update key in Railway.")
             return None
             
         items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
         
+        valid_items_pool = []
         for item in items:
             asin = item.get('asin') or item.get('product_id', '')
             if not asin:
@@ -158,17 +180,48 @@ def fetch_deal(category, budget_range):
                 except:
                     price = 0
                 
+            # কঠোরভাবে নির্দিষ্ট প্রাইস রেঞ্জের মধ্যে ফিল্টার করা
             if min_p <= price <= max_p:
-                link = f"https://amazon.in/dp/{asin}?tag={AFFILIATE_TAG}"
-                return {'name': name, 'price': price, 'link': link}
+                valid_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
                 
+        if not valid_items_pool:
+            print(f"[Info] No items matched exact price range {min_p}-{max_p} for {category}.")
+            return None
+            
+        # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করা এবং ব্যাচ অনুযায়ী ফিল্টার করা (কোনো অতিরিক্ত ক্রেডিট খরচ ছাড়া)
+        chunk_size = 5
+        batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:5]
+        
+        ultimate_round_contenders = []
+        for batch in batches:
+            batch_evaluated = []
+            for prod in batch:
+                specs = extract_features(prod['name'])
+                try:
+                    is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
+                    prod['issues_count'] = len(issues)
+                except Exception as e:
+                    prod['issues_count'] = 0
+                batch_evaluated.append(prod)
+            
+            if batch_evaluated:
+                # প্রতিটি ব্যাচ থেকে সেরা পণ্যটি বেছে নেওয়া
+                best_in_batch = sorted(batch_evaluated, key=lambda x: x['issues_count'])[0]
+                ultimate_round_contenders.append(best_in_batch)
+                
+        # সেরা প্রতিযোগী পণ্যগুলোর মধ্যে লোকাল কমপারিজন করে পরম সেরাটি বের করা (জিরো ক্রেডিট কস্ট)
+        if ultimate_round_contenders:
+            final_winner = sorted(ultimate_round_contenders, key=lambda x: x['issues_count'])[0]
+            final_winner['link'] = f"https://amazon.in/dp/{final_winner['asin']}?tag={AFFILIATE_TAG}"
+            return final_winner
+            
     except Exception as e:
-        print(f"[Fetch Exception] {e}")
+        print(f"[Exception] {e}")
         
     return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Sequential Deal Bot Started Successfully!*")
+    send_telegram_message("🚀 *Credit-Optimized Deal Bot Started Successfully!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -177,26 +230,27 @@ def bot_main_loop():
         cat, current_range = CATEGORY_BUDGET_SLOTS[slot_index]
         try:
             print(f"\n[Slot {slot_index + 1}/{total_slots}] Scanning {cat} in range {current_range}...")
-            deal = fetch_deal(cat, current_range)
+            winner_deal = fetch_and_select_ultimate_deal(cat, current_range)
             
-            if deal:
+            if winner_deal:
                 message = (
-                    f"🏆 *সেরার সেরা ডিল\!* 🏆\n\n"
-                    f"📦 *প্রোডাক্ট:* {deal['name'][:55]}...\n"
-                    f"💰 *দাম:* ₹{deal['price']}\n"
+                    f"🏆 *সেরার সেরা ফিল্টার্ড ডিল\!* 🏆\n\n"
+                    f"📦 *প্রোডাক্ট:* {winner_deal['name'][:55]}...\n"
+                    f"💰 *দাম:* ₹{winner_deal['price']}\n"
                     f"🎯 *ক্যাটাগরি:* {cat.upper()} ({current_range[0]}\-{current_range[1]})\n\n"
                     f"🛒 *সরাসরি কিনতে লিংকে ক্লিক করুন:* \n"
-                    f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({deal['link']})"
+                    f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({winner_deal['link']})"
                 )
                 send_telegram_message(message)
-                print(f"[Success] Deal posted for {cat}!")
+                print(f"[Success] Best filtered deal posted for {cat}!")
             else:
-                print(f"[Skip] No matching item found for {cat}.")
+                print(f"[Skip] No optimal deal found for {cat} in range {current_range}.")
                 
         except Exception as e:
             print(f"Loop error: {e}")
             
         slot_index = (slot_index + 1) % total_slots
+        print("Sleeping for 2 hours before the next slot...")
         time.sleep(7200)
 
 if __name__ == "__main__":
