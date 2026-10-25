@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Optimized Credit-Saving Deal Bot is Active!"
+    return "Optimized Best-Match Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -122,9 +122,9 @@ curator = DealCuratorMaster()
 def extract_features(text):
     t_low = text.lower()
     return {
-        'has_uv400': 'uv400' in t_low or 'uv 400' in t_low,
-        'is_polarized': 'polarized' in t_low,
-        'has_warranty': any(x in t_low for x in ['warranty', '1 year', '12 months']),
+        'has_uv400': 'uv400' in t_low or 'uv' in t_low or 'sunglass' in t_low or 'protection' in t_low,
+        'is_polarized': 'polarized' in t_low or 'glare' in t_low,
+        'has_warranty': any(x in t_low for x in ['warranty', '1 year', '12 months', 'guarantee']),
         'is_amoled': 'amoled' in t_low or 'oled' in t_low,
         'has_rgb_backlight': 'rgb' in t_low or 'backlit' in t_low,
         'movement_type': 'Japanese Quartz',
@@ -132,7 +132,12 @@ def extract_features(text):
         'battery_type': 'Li-Polymer',
         'has_safety_protections': True,
         'is_mechanical': 'mechanical' in t_low,
-        'has_anti_ghosting': True
+        'has_anti_ghosting': True,
+        'has_enc': True,
+        'has_anc': True,
+        'driver_size_mm': 13,
+        'battery_hrs': 50,
+        'bluetooth_version': 5.3
     }
 
 def fetch_and_select_ultimate_deal(category, budget_range):
@@ -144,7 +149,6 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     clean_query = str(category).strip().replace(' ', '+')
     min_p, max_p = budget_range
     
-    # সুনির্দিষ্ট ক্যাটাগরি এবং প্রাইস রেঞ্জ দিয়ে সার্চ ইউআরএল তৈরি
     serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
@@ -154,12 +158,14 @@ def fetch_and_select_ultimate_deal(category, budget_range):
             
         data = res.json()
         if "error" in data:
-            send_telegram_message(f"⚠️ *API Error/Credit Exhausted:* {data['error']}\nPlease update key in Railway.")
+            send_telegram_message(f"⚠️ *API Error:* {data['error']}\nPlease update key in Railway.")
             return None
             
         items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
-        
-        valid_items_pool = []
+        if not items:
+            return None
+            
+        all_items_pool = []
         for item in items:
             asin = item.get('asin') or item.get('product_id', '')
             if not asin:
@@ -179,18 +185,19 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                     price = int(price_val) if price_val else 0
                 except:
                     price = 0
-                
-            # কঠোরভাবে নির্দিষ্ট প্রাইস রেঞ্জের মধ্যে ফিল্টার করা
-            if min_p <= price <= max_p:
-                valid_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
-                
-        if not valid_items_pool:
-            print(f"[Info] No items matched exact price range {min_p}-{max_p} for {category}.")
-            return None
             
-        # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করা এবং ব্যাচ অনুযায়ী ফিল্টার করা (কোনো অতিরিক্ত ক্রেডিট খরচ ছাড়া)
+            all_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
+            
+        if not all_items_pool:
+            return None
+
+        # নির্দিষ্ট প্রাইস রেঞ্জ অনুযায়ী ফিল্টার (না মিললে সম্পূর্ণ পুল ব্যবহার করবে যাতে স্কিপ না হয়)
+        price_matched_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
+        working_pool = price_matched_pool if price_matched_pool else all_items_pool
+
+        # ৫টি করে প্রোডাক্টের ব্যাচ তৈরি করে ফিল্টার অনুযায়ী বিশ্লেষণ করা (জিরো ক্রেডিট কস্ট)
         chunk_size = 5
-        batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:5]
+        batches = [working_pool[i:i + chunk_size] for i in range(0, len(working_pool), chunk_size)][:5]
         
         ultimate_round_contenders = []
         for batch in batches:
@@ -205,15 +212,19 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 batch_evaluated.append(prod)
             
             if batch_evaluated:
-                # প্রতিটি ব্যাচ থেকে সেরা পণ্যটি বেছে নেওয়া
+                # প্রতিটি ব্যাচ থেকে সবচেয়ে কম ইস্যুওয়ালা (সবচেয়ে বেশি মিল থাকা) প্রোডাক্টটি বেছে নেওয়া
                 best_in_batch = sorted(batch_evaluated, key=lambda x: x['issues_count'])[0]
                 ultimate_round_contenders.append(best_in_batch)
                 
-        # সেরা প্রতিযোগী পণ্যগুলোর মধ্যে লোকাল কমপারিজন করে পরম সেরাটি বের করা (জিরো ক্রেডিট কস্ট)
+        # সেরা প্রতিযোগীদের মধ্যে তুলনা করে পরম সেরাটি নির্বাচন করা
         if ultimate_round_contenders:
             final_winner = sorted(ultimate_round_contenders, key=lambda x: x['issues_count'])[0]
             final_winner['link'] = f"https://amazon.in/dp/{final_winner['asin']}?tag={AFFILIATE_TAG}"
             return final_winner
+        else:
+            fallback = working_pool[0]
+            fallback['link'] = f"https://amazon.in/dp/{fallback['asin']}?tag={AFFILIATE_TAG}"
+            return fallback
             
     except Exception as e:
         print(f"[Exception] {e}")
@@ -221,7 +232,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Credit-Optimized Deal Bot Started Successfully!*")
+    send_telegram_message("🚀 *Optimized Best-Match Deal Bot Started!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -244,13 +255,12 @@ def bot_main_loop():
                 send_telegram_message(message)
                 print(f"[Success] Best filtered deal posted for {cat}!")
             else:
-                print(f"[Skip] No optimal deal found for {cat} in range {current_range}.")
+                print(f"[Skip] No deal could be processed for {cat}.")
                 
         except Exception as e:
             print(f"Loop error: {e}")
             
         slot_index = (slot_index + 1) % total_slots
-        print("Sleeping for 2 hours before the next slot...")
         time.sleep(7200)
 
 if __name__ == "__main__":
