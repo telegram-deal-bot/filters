@@ -167,16 +167,11 @@ def fetch_and_select_ultimate_deal(category, budget_range):
     min_p, max_p = budget_range
     query_str = f"{category} under {max_p}"
     
-    # সঠিক প্যারামিটারসহ requests.get ব্যবহার করা হচ্ছে যাতে কোনো 400 Bad Request না আসে
-    params = {
-        "engine": "amazon",
-        "q": query_str,
-        "amazon_domain": "amazon.in",
-        "api_key": SERPAPI_API_KEY
-    }
+    # SerpApi রিকোয়েস্ট URL সরাসরি তৈরি করা হচ্ছে যাতে কোনো মিসিং প্যারামিটার এরর না আসে
+    serp_url = f"https://serpapi.com/search.json?engine=amazon&k={query_str}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
-        res = requests.get("https://serpapi.com/search.json", params=params, timeout=30)
+        res = requests.get(serp_url, timeout=30)
         if res.status_code != 200:
             print(f"[API Error] Status code: {res.status_code}, Response: {res.text}")
             return None
@@ -218,14 +213,13 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         if not all_items_pool:
             return None
 
-        # প্রাইস রেঞ্জে ১০০% কড়াকড়ি (শুধু নির্দিষ্ট রেঞ্জের পণ্য ফিল্টার করা)
+        # নির্দিষ্ট প্রাইস রেঞ্জে ১০০% কড়াকড়ি ফিল্টার
         strict_price_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
         
         if not strict_price_pool:
             print(f"[Info] No items found in exact range {min_p}-{max_p} for {category}.")
             return None
 
-        # ৫টি প্রোডাক্টের ব্যাচ তৈরি করা এবং filters.py এর মাধ্যমে মূল্যায়ন করা
         chunk_size = 5
         batches = [strict_price_pool[i:i + chunk_size] for i in range(0, len(strict_price_pool), chunk_size)][:5]
         
