@@ -4,13 +4,12 @@ import random
 import requests
 from flask import Flask
 from threading import Thread
-from filters import DealCuratorMaster
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Multi-API Deal Bot with Smart Progressive Price-Range Round-Robin is Active!"
+    return "Simple & Robust Sequential Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -20,10 +19,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("CHAT_ID")
 AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "technicalbot2-21")
 
-EASYPARSER_API_KEY = os.environ.get("EASYPARSER_API_KEY")
-GEEKFLARE_API_KEY = os.environ.get("GEEKFLARE_API_KEY")
+# একটি মাত্রভিন্ন প্রাইমারি এপিআই কি (Railway থেকে কন্ট্রোল করার জন্য)
 SERPAPI_API_KEY = os.environ.get("SERPAPI_API_KEY")
-APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN")
 
 def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -117,140 +114,64 @@ CATEGORY_BUDGET_SLOTS = [
     ('headphone', (4000, 5000)),
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
-    ('tws', (4000, 5000))
+    ('tws', (4000, 5000)]
 ]
 
-curator = DealCuratorMaster()
+def fetch_deal(category, budget_range):
+    if not SERPAPI_API_KEY:
+        print("[Error] SERPAPI_API_KEY is missing in Railway Variables!")
+        send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway! Please update.")
+        return None
 
-def human_delay(min_sec=1.5, max_sec=3.0):
-    time.sleep(random.uniform(min_sec, max_sec))
+    clean_query = str(category).strip().replace(' ', '+')
+    min_p, max_p = budget_range
+    serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
+    
+    try:
+        res = requests.get(serp_url, timeout=30)
+        if res.status_code != 200:
+            print(f"[API Error] Status code: {res.status_code}")
+            return None
+            
+        data = res.json()
+        if "error" in data:
+            print(f"[API Limit/Error] {data['error']}")
+            send_telegram_message(f"⚠️ *API Credit Exhausted or Error:* {data['error']}\n\nPlease update key in Railway.")
+            return None
+            
+        items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
+        
+        for item in items:
+            asin = item.get('asin') or item.get('product_id', '')
+            if not asin:
+                continue
+            name = item.get('title', '') or item.get('name', '')
+            price_val = item.get('price', 0)
+            
+            if isinstance(price_val, dict):
+                price_val = price_val.get('value', 0) or price_val.get('raw', 0)
 
-def make_api_request(query_term, operation_type="SEARCH"):
-    # ১. প্রথমে SerpApi দিয়ে চেষ্টা করবে সঠিক প্যারামিটার সহ
-    if SERPAPI_API_KEY:
-        try:
-            serp_url = f"https://serpapi.com/search.json?engine=amazon&q={query_term}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
-            res = requests.get(serp_url, timeout=30)
-            if res.status_code == 200:
-                data = res.json()
-                if "error" not in str(data).lower() and ("organic_results" in data or "shopping_results" in data or "search_results" in data):
-                    return data
-        except Exception as e:
-            print(f"[Fallback] SerpApi failed: {e}")
-
-    # ২. Geekflare ফলব্যাক
-    if GEEKFLARE_API_KEY:
-        try:
-            headers = {'x-api-key': GEEKFLARE_API_KEY}
-            gf_url = f"https://api.geekflare.com/search?url=https://www.amazon.in/s?k={query_term}"
-            res = requests.get(gf_url, headers=headers, timeout=30)
-            if res.status_code == 200:
-                return res.json()
-        except Exception as e:
-            print(f"[Fallback] Geekflare failed: {e}")
-
-    # ৩. Easyparser ফলব্যাক
-    if EASYPARSER_API_KEY:
-        try:
-            api_endpoint = "https://realtime.easyparser.com/v1/request"
-            params = {"api_key": EASYPARSER_API_KEY, "platform": "AMZ", "operation": operation_type, "domain": ".in", "url": f"https://www.amazon.in/s?k={query_term}"}
-            res = requests.get(api_endpoint, params=params, timeout=30)
-            if res.status_code == 200:
-                data = res.json()
-                if "depleted" not in str(data).lower():
-                    return data
-        except Exception as e:
-            print(f"[Fallback] Easyparser failed: {e}")
-
+            if isinstance(price_val, str):
+                price_text = price_val.replace(',', '').replace('₹', '')
+                digits = ''.join(filter(str.isdigit, price_text))
+                price = int(digits) if digits else 0
+            else:
+                try:
+                    price = int(price_val) if price_val else 0
+                except:
+                    price = 0
+                
+            if min_p <= price <= max_p:
+                link = f"https://amazon.in/dp/{asin}?tag={AFFILIATE_TAG}"
+                return {'name': name, 'price': price, 'link': link}
+                
+    except Exception as e:
+        print(f"[Fetch Exception] {e}")
+        
     return None
 
-def deep_visit_product(asin, category, price):
-    product_url = f"https://www.amazon.in/dp/{asin}"
-    if EASYPARSER_API_KEY or GEEKFLARE_API_KEY:
-        try:
-            human_delay(1.0, 2.0)
-            # সিম্পল ডেমো চেক বা ফিল্টার ইভ্যালুয়েশন
-            specs = {'has_uv400': True, 'is_polarized': True, 'has_warranty': True}
-            _, issues = curator.evaluate_product(category, price, specs)
-            return len(issues)
-        except:
-            pass
-    return 0
-
-def fetch_and_select_ultimate_deal(category, budget_range):
-    clean_query = str(category).strip().replace(' ', '+')
-    if isinstance(budget_range, tuple):
-        min_p, max_p = budget_range
-        # প্রাইস ফিল্টার সহ সার্চ কোয়েরি তৈরি
-        clean_query += f"+under+{max_p}"
-
-    print(f"\n[Crawl Start] Scanning for: {category} in range {budget_range}")
-    
-    data = make_api_request(clean_query, operation_type="SEARCH")
-    if not data:
-        print(f"[Warning] All APIs failed for {category}.")
-        return None
-        
-    result_content = data.get('result', {}) or data.get('organic_results', {}) or data.get('shopping_results', {})
-    items = result_content.get('search_results', []) or result_content.get('items', []) or data.get('organic_results', []) or data.get('shopping_results', [])
-    
-    valid_items_pool = []
-    for item in items:
-        asin = item.get('asin') or item.get('product_id', '')
-        if not asin:
-            continue
-            
-        name = item.get('title', '') or item.get('name', '')
-        price_val = item.get('price', 0)
-        
-        if isinstance(price_val, dict):
-            price_val = price_val.get('value', 0) or price_val.get('raw', 0)
-
-        if isinstance(price_val, str):
-            price_text = price_val.replace(',', '').replace('₹', '')
-            digits = ''.join(filter(str.isdigit, price_text))
-            price = int(digits) if digits else 0
-        else:
-            try:
-                price = int(price_val) if price_val else 0
-            except:
-                price = 0
-            
-        if price > 0:
-            if isinstance(budget_range, tuple):
-                min_b, max_b = budget_range
-                if not (min_b <= price <= max_b):
-                    continue
-            valid_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
-            
-    if not valid_items_pool:
-        print(f"[Info] No valid items found for {category} in range {budget_range}.")
-        return None
-        
-    # ব্যাচ ওয়াইজ ফিল্টারিং
-    ultimate_round_contenders = []
-    chunk_size = 5
-    batches = [valid_items_pool[i:i + chunk_size] for i in range(0, len(valid_items_pool), chunk_size)][:2]
-    
-    for batch in batches:
-        batch_evaluated = []
-        for prod in batch:
-            issues_count = deep_visit_product(prod['asin'], category, prod['price'])
-            prod['issues_count'] = issues_count
-            batch_evaluated.append(prod)
-        if batch_evaluated:
-            best_in_batch = sorted(batch_evaluated, key=lambda x: x['issues_count'])[0]
-            ultimate_round_contenders.append(best_in_batch)
-            
-    if ultimate_round_contenders:
-        final_winner = sorted(ultimate_round_contenders, key=lambda x: x['issues_count'])[0]
-        final_winner['link'] = f"https://amazon.in/dp/{final_winner['asin']}?tag={AFFILIATE_TAG}"
-        return final_winner
-        
-    return valid_items_pool[0] if valid_items_pool else None
-
 def bot_main_loop():
-    send_telegram_message("🚀 *Multi-API Progressive Deal Bot Started!* \n\nSequential scanning with automatic API fallback active.")
+    send_telegram_message("🚀 *Sequential Deal Bot Started Successfully!* \n\nFollowing exact category & price slots.")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -258,26 +179,26 @@ def bot_main_loop():
     while True:
         cat, current_range = CATEGORY_BUDGET_SLOTS[slot_index]
         try:
-            print(f"\n[Slot {slot_index + 1}/{total_slots}] Processing {cat} in range {current_range}...")
+            print(f"\n[Slot {slot_index + 1}/{total_slots}] Scanning {cat} in range {current_range}...")
             
-            winner_deal = fetch_and_select_ultimate_deal(cat, current_range)
+            deal = fetch_deal(cat, current_range)
             
-            if winner_deal:
+            if deal:
                 message = (
-                    f"🏆 *সেরার সেরা ফিল্টার্ড ডিল\!* 🏆\n\n"
-                    f"📦 *প্রোডাক্ট:* {winner_deal['name'][:55]}...\n"
-                    f"💰 *দাম:* ₹{winner_deal['price']}\n"
+                    f"🏆 *সেরার সেরা ডিল\!* 🏆\n\n"
+                    f"📦 *প্রোডাক্ট:* {deal['name'][:55]}...\n"
+                    f"💰 *দাম:* ₹{deal['price']}\n"
                     f"🎯 *ক্যাটাগরি:* {cat.upper()} ({current_range[0]}\-{current_range[1]})\n\n"
                     f"🛒 *সরাসরি কিনতে লিংকে ক্লিক করুন:* \n"
-                    f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({winner_deal['link']})"
+                    f"🔗 [এখানে ক্লিক করে অর্ডার করুন]({deal['link']})"
                 )
                 send_telegram_message(message)
-                print(f"[Success] Deal posted for {cat} in range {current_range}!")
+                print(f"[Success] Deal posted for {cat}!")
             else:
-                print(f"[Skip] No deal found for {cat} in range {current_range}.")
+                print(f"[Skip] No matching item found for {cat} in range {current_range}.")
                 
         except Exception as e:
-            print(f"Loop runtime error: {e}")
+            print(f"Loop error: {e}")
             
         slot_index = (slot_index + 1) % total_slots
         print("Sleeping for 2 hours before the next slot...")
