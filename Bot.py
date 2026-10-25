@@ -114,7 +114,7 @@ CATEGORY_BUDGET_SLOTS = [
     ('headphone', (4000, 5000)),
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
-    ('tws', (4000, 5000)]
+    ('tws', (4000, 5000))
 ]
 
 curator = DealCuratorMaster()
