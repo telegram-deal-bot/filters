@@ -19,7 +19,6 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("CHAT_ID")
 AFFILIATE_TAG = os.environ.get("AFFILIATE_TAG", "technicalbot2-21")
 
-# একটি মাত্রভিন্ন প্রাইমারি এপিআই কি (Railway থেকে কন্ট্রোল করার জন্য)
 SERPAPI_API_KEY = os.environ.get("SERPAPI_API_KEY")
 
 def send_telegram_message(text):
@@ -33,7 +32,7 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট
+# সঠিক ব্র্যাকেট এবং সিনট্যাক্স সহ মাস্টার সিকোয়েন্স ও প্রাইস স্লট
 CATEGORY_BUDGET_SLOTS = [
     ('sunglass', (500, 1000)),
     ('watch', (500, 1000)),
@@ -114,13 +113,13 @@ CATEGORY_BUDGET_SLOTS = [
     ('headphone', (4000, 5000)),
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
-    ('tws', (4000, 5000)]
+    ('tws', (4000, 5000))  # সবশেষ ব্র্যাকেট সঠিকভাবে বন্ধ করা হয়েছে
 ]
 
 def fetch_deal(category, budget_range):
     if not SERPAPI_API_KEY:
-        print("[Error] SERPAPI_API_KEY is missing in Railway Variables!")
-        send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway! Please update.")
+        print("[Error] SERPAPI_API_KEY is missing!")
+        send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway!")
         return None
 
     clean_query = str(category).strip().replace(' ', '+')
@@ -130,13 +129,11 @@ def fetch_deal(category, budget_range):
     try:
         res = requests.get(serp_url, timeout=30)
         if res.status_code != 200:
-            print(f"[API Error] Status code: {res.status_code}")
             return None
             
         data = res.json()
         if "error" in data:
-            print(f"[API Limit/Error] {data['error']}")
-            send_telegram_message(f"⚠️ *API Credit Exhausted or Error:* {data['error']}\n\nPlease update key in Railway.")
+            send_telegram_message(f"⚠️ *API Credit Exhausted:* {data['error']}\nPlease update key in Railway.")
             return None
             
         items = data.get('organic_results', []) or data.get('shopping_results', []) or data.get('search_results', [])
@@ -171,7 +168,7 @@ def fetch_deal(category, budget_range):
     return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Sequential Deal Bot Started Successfully!* \n\nFollowing exact category & price slots.")
+    send_telegram_message("🚀 *Sequential Deal Bot Started Successfully!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -180,7 +177,6 @@ def bot_main_loop():
         cat, current_range = CATEGORY_BUDGET_SLOTS[slot_index]
         try:
             print(f"\n[Slot {slot_index + 1}/{total_slots}] Scanning {cat} in range {current_range}...")
-            
             deal = fetch_deal(cat, current_range)
             
             if deal:
@@ -195,13 +191,12 @@ def bot_main_loop():
                 send_telegram_message(message)
                 print(f"[Success] Deal posted for {cat}!")
             else:
-                print(f"[Skip] No matching item found for {cat} in range {current_range}.")
+                print(f"[Skip] No matching item found for {cat}.")
                 
         except Exception as e:
             print(f"Loop error: {e}")
             
         slot_index = (slot_index + 1) % total_slots
-        print("Sleeping for 2 hours before the next slot...")
         time.sleep(7200)
 
 if __name__ == "__main__":
