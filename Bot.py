@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Robust Deal Bot is Active!"
+    return "Stable Deal Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -166,10 +166,10 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         send_telegram_message("⚠️ *Alert:* SerpApi Key missing in Railway!")
         return None
 
-    clean_query = str(category).strip().replace(' ', '+')
+    clean_query = str(category).strip()
     min_p, max_p = budget_range
     
-    # সরাসরি সঠিক কুয়েরি পাঠানো হচ্ছে যাতে এপিআই রেসপন্স দেয়
+    # একদম সহজ এবং স্ট্যান্ডার্ড SerpApi রিকোয়েস্ট ইউআরএল (কোনো 400 এরর হবে না)
     serp_url = f"https://serpapi.com/search.json?engine=amazon&q={clean_query}&amazon_domain=amazon.in&api_key={SERPAPI_API_KEY}"
     
     try:
@@ -214,14 +214,13 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 all_items_pool.append({'asin': str(asin), 'name': name, 'price': price})
                 
         if not all_items_pool:
-            print(f"[Info] No priced items parsed for {category}.")
             return None
 
-        # নির্দিষ্ট প্রাইস রেঞ্জে কড়াকড়ি ফিল্টারিং
+        # ১. প্রাইস রেঞ্জে ১০০% কড়াকড়ি: শুধুমাত্র নির্দিষ্ট প্রাইস রেঞ্জের (min_p থেকে max_p) মধ্যে থাকা পণ্যগুলোই ফিল্টার করা হবে
         strict_price_pool = [p for p in all_items_pool if min_p <= p['price'] <= max_p]
         
         if not strict_price_pool:
-            print(f"[Info] No items found in exact range {min_p}-{max_p} for {category}. (Available pool prices: {[p['price'] for p in all_items_pool]})")
+            print(f"[Info] No items found in exact range {min_p}-{max_p} for {category}.")
             return None
 
         # ৫টি প্রোডাক্টের ব্যাচ তৈরি করা
@@ -235,6 +234,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
                 specs = extract_flexible_specs(category, prod['name'])
                 try:
                     is_valid, issues = curator.evaluate_product(category, prod['price'], specs)
+                    # ২. ফিচারে কোনো কড়াকড়ি নেই: সর্বনিম্ন ত্রুটি বা সর্বোচ্চ মিল ওয়ালা প্রোডাক্ট নির্বাচন
                     prod['issues_count'] = len(issues)
                 except Exception as e:
                     prod['issues_count'] = 99
@@ -254,7 +254,7 @@ def fetch_and_select_ultimate_deal(category, budget_range):
         return None
 
 def bot_main_loop():
-    send_telegram_message("🚀 *Deal Bot Started & Ready!*")
+    send_telegram_message("🚀 *Deal Bot Started Successfully!*")
     
     slot_index = 0
     total_slots = len(CATEGORY_BUDGET_SLOTS)
@@ -280,7 +280,7 @@ def bot_main_loop():
                 print(f"[Skip] No matching product found in exact price range for {cat}.")
                 
         except Exception as e:
-            print(f"Loop error: {e})")
+            print(f"Loop error: {e}")
             
         slot_index = (slot_index + 1) % total_slots
         time.sleep(7200)
