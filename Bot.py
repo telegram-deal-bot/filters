@@ -36,7 +36,7 @@ def send_telegram_message(text):
     except Exception as e:
         print(f"Telegram sending error: {e}")
 
-# আপনার নির্ধারিত মাস্টার সিকোয়েন্স ও প্রাইস স্লট (সঠিক ব্র্যাকেট ও সিনট্যাক্স সহ)
+# ব্র্যাকেট এবং সিনট্যাক্স ১০০% ঠিক করা মাস্টার সিকোয়েন্স ও প্রাইস স্লট
 CATEGORY_BUDGET_SLOTS = [
     ('sunglass', (500, 1000)),
     ('watch', (500, 1000)),
@@ -117,7 +117,7 @@ CATEGORY_BUDGET_SLOTS = [
     ('headphone', (4000, 5000)),
     ('tws', (2000, 3000)),
     ('tws', (3000, 4000)),
-    ('tws', (4000, 5000)]
+    ('tws', (4000, 5000))
 ]
 
 curator = DealCuratorMaster()
